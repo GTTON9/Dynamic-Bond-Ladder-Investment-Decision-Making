@@ -1,0 +1,570 @@
+---
+output:
+  reprex::reprex_document:
+    venue: "gh"
+    advertise: FALSE
+    session_info: TRUE
+    style: TRUE
+    comment: "#;-)"
+    tidyverse_quiet: FALSE
+    std_out_err: TRUE
+knit: reprex::reprex_render
+---
+
+```{r}
+library("pdfetch") 
+library("xts") 
+library("reshape2") 
+library("ggplot2") 
+library("ggthemes") 
+library("splines")
+library("mgcv")
+library("YieldCurve")
+library("tidyverse")
+library("dplyr")
+library("splines2")
+library("nlme")
+library("tidyverse")
+library("tidymodels")
+library("MASS")
+#library("plotly")
+```
+
+## tidying data
+```{r}
+# Load the dataset
+data <- read.csv('spotSample.csv')
+
+# Format of start date and end date
+data$Maturity <- round((as.numeric(as.Date(as.character(data$MATUR_DATE), format="%Y%m%d") - 
+                            as.Date(as.character(data$START_DT), format="%Y%m%d")) / 365)*12, 1/12) /12
+# Arrange date by order of time to maturity
+data <- data %>% 
+mutate(Maturity = round(as.numeric(as.Date(as.character(MATUR_DATE), format="%Y%m%d") - 
+as.Date(as.character(START_DT), format="%Y%m%d")) / 365*12, 1/12)/12) %>%
+arrange(Maturity) 
+
+# Plot the data by start date, which ends up with a nested list
+date_list <- data %>%
+  group_by(START_DT) %>%
+  group_split() %>%
+  lapply(function(sub_tibble) {
+    sub_tibble %>% distinct() %>% arrange(Maturity) 
+  }) 
+  
+standard_mats <- date_list[[1]]$Maturity
+std_int_knots <- as.vector(c(1/12, quantile(standard_mats, probs= c(.2,.4,.6,.8)), 30))
+```
+
+
+Compute the Basis function using the Cox-deBoor Algorithm.
+This function was copied from the CRAN document
+https://cran.r-project.org/web/packages/crs/vignettes/spline_primer.pdf
+I did my own implementation of this function but it is not as nice.
+
+This is just an implementation of the Cox-deBoor recursion
+
+```{r}
+basis <- function(x, degree, i, knots){
+  if(degree == 0){
+    B <- ifelse((x>=knots[i])&(x<knots[i+1]),1,0)
+  } else {
+    if((knots[degree + i] - knots[i]) == 0){
+      if(x != knots[i+degree]){
+        alpha1 <- 0
+      } else {
+        return(1)
+      }
+    } else {
+      alpha1 <- (x-knots[i])/(knots[degree+i] - knots[i])
+    }
+    if((knots[i+degree+1] - knots[i+1]) == 0){
+      if(x != knots[i+degree]){
+        alpha2 <- 0
+      } else {
+        return(1)
+      }
+    } else {
+      alpha2 <- (knots[i+degree+1] - x) / (knots[i+degree+1] - knots[i+1])
+    }
+    B <- alpha1 * basis(x, (degree-1), i, knots) + 
+      alpha2*basis(x, (degree-1), (i+1), knots)
+  }
+  return(B)
+}
+
+```
+
+Construct the matrix $\mathbf{B}$, column by column.
+Matrix $B$ contains the basis functions computed through the Cox-deBoor recursive formulas using the function defined in the codechunk above, evaluated at different times to maturity (rows) and at different knot intervals (columns). For more details, check FURM on canvas
+
+```{r}
+matrix_b <- function(x, degree=3, int_knots) { 
+  # the x argument takes in a vector of time values that 
+  # will be used to evaluate a design matrix of basis functions 
+  # the degree argument specifies the highest degree of polynomials for
+  # the basis functions
+  # the int_knots argument takes in a vector of knots that will be used 
+  # to determine the intervals of the piecewise function
+  bound_knots <- int_knots[c(1, length(int_knots))] # this line creates bound knots
+  knots <- c(rep(bound_knots[1], (degree+1)), int_knots[c(-1, -length(int_knots))], rep(bound_knots[2], (degree+1)))
+  # the line above adds a couple of extra knots to each end of the int_knots vector because of the Cox-deBoor recursion
+  K <- length(int_knots) + degree - 1 # number of columns in the Basis matrix
+  B.mat <- matrix(0,nrow = length(x), ncol = K) # initialize the matrix
+  for(j in 1:K) {
+    B.mat[,j] <- sapply(X = x, FUN = basis, degree = degree, i = j, knots = knots) # add each column, one by one
+  }
+  return(B.mat) # return the matrix
+}
+```
+
+
+test the functions on the yield rates provided by Avery
+basically, minimize:
+
+$$
+\text{MSE}(\alpha|\mathbf{B}, r) = (r - \mathbf{B}\alpha)^T(r-\mathbf{B}\alpha)
+$$
+Using OLS (unpenalized)
+
+$$
+\alpha = (\mathbf{B}^T\mathbf{B})^{-1} \mathbf{B}^T r
+$$
+where $r$ is a vector of yield rates
+
+Manny: I also changed this file a little, but the output is still a data frame with two columns
+(yield, ttm) 
+```{r}
+interp_yc <- function(yield_list, int_knots, degree = 3, d, last_tenor){
+  yc_df_pre <- yield_list[[d]]
+  last_row <- which(round(yc_df_pre$Maturity,3) == last_tenor)
+  yc_df <- yc_df_pre[1:last_row,]
+  yields <- yc_df$ZERO_YLD1
+  maturities <- as.numeric(yc_df$Maturity)
+  n <- length(maturities) # number of maturity dates
+  x <- as.numeric(yc_df$Maturity) # maturity dates
+  B <- matrix_b(x, degree=degree, int_knots = int_knots) 
+  B_t_B <- t(B) %*% B
+  # B is the design matrix on which the least squares coefficients will be calculated
+  
+  alphas <- solve(B_t_B) %*% t(B) %*% yields # OLS Formula for coefficients
+  x2 <- seq(1/12, last_tenor, 1/12) # this range is used to simulate a continuous yield curve
+  B2 <- matrix_b(x2, degree = degree, int_knots = int_knots) 
+  # B2 is the matrix of basis functions but evaluated at a 'continuous' time (not really but close enough)
+  
+  interpolated_yields <- data.frame(Maturity = x2, ZERO_YLD1 = B2 %*% alphas) # create dataframes for plotting
+  og_yields <- data.frame(ttm = maturities, yield = yields)
+
+  return(interpolated_yields)
+}
+interp_yc(date_list, std_int_knots, degree = 3, 2, last_tenor = 20)
+std_int_knots20
+plot(standard_mats[1:24], date_list[[2]]$ZERO_YLD1[1:24])
+lines(interp_yc(date_list, std_int_knots20, degree = 3, 2, last_tenor = 20)$Maturity, interp_yc(date_list, std_int_knots20, degree = 3, 2, last_tenor = 20)$ZERO_YLD1)
+
+
+```
+
+```{r}
+interpolate_list <- function(yield_list, start, T_, int_knots, degree = 3, last_tenor = 20){
+  interpolated_yc <- list()
+  k <- 1
+  for(i in start:(start + T_)){
+    interpolated_yc[[k]] <- interp_yc(yield_list = yield_list,
+                                      int_knots = int_knots,
+                                      d = i,
+                                      last_tenor = last_tenor)
+    k <- k + 1
+  }
+  return(interpolated_yc)
+}
+
+interpolate_list(date_list, 1, 10, std_int_knots20, 3, 20)
+```
+
+This code is used for Synthetic data Simulation
+
+```{r}
+
+generate_data <- function(T_, betas = c(4, 0, -5), lambda = 0.5, GLS = FALSE, maturities = c(seq(1/12, 20, 10 / 3),20)) {
+  test_data <- list() 
+  N <- length(maturities)
+  cov_matrix = NULL
+  sigma2 = NULL
+  # GLS setup with Wishart covariance matrix
+  if (GLS) {
+    df <- N + 1 
+    scale_matrix <- diag(N) * .001
+    cov_matrix <- rWishart(1, df = df, Sigma = scale_matrix)[,,1]
+  } else {
+    sigma2 <- runif(1, 0.01, 0.05)
+    sigma <- sqrt(sigma2)
+  }
+  
+
+  for (j in 1:T_) {
+    # Fixed betas for simplicity
+      # Random epsilon
+
+    # Vectorized computation for ZERO_YLD1
+    term1 <- betas[1]
+    term2 <- betas[2] * ((1 - exp(-lambda * maturities)) / (lambda * maturities))
+    term3 <- betas[3] * (((1 - exp(-lambda * maturities)) / (lambda * maturities)) - exp(-lambda * maturities))
+
+    if (GLS) {
+      noise <- mvrnorm(1, mu = rep(0, N), Sigma = cov_matrix)
+    } else {
+      noise <- rnorm(N, mean = 0, sd = sigma)
+    }
+
+    ZERO_YLD1 <- term1 + term2 + term3 + noise
+
+    # Create dataset for current time point
+    data <- tibble(Maturity = maturities, ZERO_YLD1 = ZERO_YLD1)
+    test_data[[j]] <- data
+
+  }
+
+  return(list(test_data = test_data, betas = betas, cov_mat = cov_matrix, sigma2 = sigma2, lambda = lambda))
+}
+
+```
+
+This is the code for NS over a time window, uses the algorithm that zimo explained to us on Sunday Nov 3rd (Static OLS form)
+```{r}
+# Fit and plot the fitted nelson siegel model
+# over a time window
+fit_nelson_siegel <- function(yield_list, int_knots = std_int_knots, lambda, start, T_, static = TRUE){
+  # yield_list: Parameter of the form of a list of data frames containing ZCB yields
+  # int knots: The interior knots used for b-spline construction
+  # lambda: Individual lambda parameter for NS
+  # row_idx: The row indices used for decimating the yield curve after bootstrap and interpolation
+  # start: starting date from the yield_list list
+  # T_: length of time window
+  maturities <- yield_list[[1]]$Maturity
+
+  N <- length(maturities)
+  #if(T_ + start > length(yield_list)){
+   # return('choose another time window')
+  #}
+  term1 <- 1
+  term2 <- (1 - exp(-maturities*lambda)) / (maturities*lambda)
+  term3 <- ((1 - exp(-maturities*lambda)) / (maturities*lambda)) - exp(-maturities*lambda)
+  Phi <- cbind(term1, term2, term3) # Construct Phi matrix for NS
+  
+  Y_mat <- matrix(0, nrow = N, # matrix of N by T, containing yields for each tenor (columns)
+                  ncol = T_) # where each column represents a different date
+  
+  for(t in 1:T_){
+  bs_yield_curve <- yield_list[[t]]$Maturity
+  Y_mat[,t] <- yield_list[[t]]$ZERO_YLD1
+  
+  
+  phitphi_1phit <- solve(t(Phi) %*% Phi) %*% t(Phi) # OLS for the coefficients for every single day
+  betas_t <- phitphi_1phit %*% Y_mat  
+  
+
+  if(static == TRUE){
+    betas <- rowSums(betas_t) / T_ # average all coefficients
+    eps <- matrix(0, nrow = N, ncol = T_) # matrix of errors for each day (column) and each tenor (row)
+    for(t in 1:T_){
+      eps[,t] <- Y_mat[,t] - Phi %*% betas # Populate errors
+    }
+    sig_hat2 <- sum(as.vector(eps)^2) / (N * T_ - 3) # take mean squared error (MLE Estimator)
+  }else{
+    betas <- t(betas_t)
+    colnames(betas) <- c("beta1", "beta2", "beta3")
+  
+    eps <- matrix(0, 
+                  nrow = N, 
+                  ncol = T_) # matrix of errors for each day (column) and each tenor (row)
+    for(t in 1:T_){
+      eps[,t] <- Y_mat[,t] - Phi %*% t(betas)[,t] # Populate errors
+    }
+    sig_hat2 <- sum(eps^2) / (N * T_ - 3 * T_) # take mean squared error (MLE Estimator)
+  }
+}
+
+  return(list(betas = betas, # fitted betas static: 1*3   dynamic: T*3
+              sigma2 = sig_hat2, # MSE
+              lambda = lambda, # lambda(input)
+              Phi = Phi, # Nelson Siegel design matrix N*3
+              eps = eps)) # residuals N*T
+  
+}
+```
+
+Code for static GLS
+
+```{r}
+fit_nelson_siegel_GLS <- function(yield_list, int_knots = std_int_knots, lambda, start, T_, avg_cov = NULL, static = TRUE) {
+  
+  max_iteration <- 1000 # max iteration
+  maturities <- yield_list[[1]]$Maturity
+  N <- length(maturities) # number of tenor
+  term1 <- 1
+  term2 <- (1 - exp(-maturities * lambda)) / (maturities * lambda)
+  term3 <- ((1 - exp(-maturities * lambda)) / (maturities * lambda)) - exp(-maturities * lambda)
+  Phi <- cbind(term1, term2, term3)
+  
+  # Initialize the matrix for observed yields (Y_mat)
+  Y_mat <- matrix(0, nrow = N, ncol = T_)
+  
+  # Populate Y_mat with yields for each tenor
+  for(t in 1:T_) {
+    Y_mat[,t] <- yield_list[[t]]$ZERO_YLD1
+  }
+
+  if (is.null(avg_cov)) { # initialize covariance matrix as diagonal
+    avg_cov <- diag(N)
+  }
+  
+  betas <- c(0, 0, 0) # initial beta
+
+  # Iterative GLS estimation
+  for (i in 1:max_iteration) {
+    # Transform Y and Phi for the GLS step
+    L <- t(chol(avg_cov + 1e-6 * diag(ncol(avg_cov))))
+    Y_mat_trans <- solve(L, Y_mat)
+    Phi_trans <- solve(L, Phi)
+    
+    # Compute new betas by OLS case
+    phitphi_inv <- solve(t(Phi_trans) %*% Phi_trans)
+    betas_new <- rowMeans(phitphi_inv %*% t(Phi_trans) %*% Y_mat_trans)
+    
+    # Check for convergence
+    if (sum((betas - betas_new)^2) < 1e-8) {
+      betas <- betas_new
+      break
+    }
+    # Update betas
+    betas <- betas_new
+    fitted_yields <- Phi %*% betas  # compute the estimated beta
+    fitted_yields_matrix <- matrix(fitted_yields, nrow = N, ncol = T_, byrow = FALSE)
+    
+    # Compute residuals
+    eps <- Y_mat - fitted_yields_matrix
+    
+    avg_cov <- eps %*% t(eps) / (T_ - 3)
+    
+  }
+  
+  # Final sigma estimate based on residuals
+  sig_hat <- sum(eps^2) / (N * T_ - 3)
+  
+  return(list(betas = betas, cov_mat = avg_cov, lambda = lambda, Phi = Phi, eps = eps))
+}
+```
+
+
+Simulations for OLS fitting tests:
+
+```{r}
+# Generate Data
+
+OLS_syn_data <- generate_data(1000)
+OLS_syn_yields <- OLS_syn_data$test_data
+OLS_syn_betas <- OLS_syn_data$betas
+OLS_syn_sigma2 <- OLS_syn_data$sigma
+# Fit using OLS
+
+OLS_syn_fit <- fit_nelson_siegel(OLS_syn_yields,
+                                 int_knots = std_int_knots20,
+                                 lambda = 0.5,
+                                 start = 1,
+                                 T_ = 1000)
+# Check for sigma estimation
+OLS_syn_sigma2
+OLS_syn_fit$sigma2 
+
+# Check for beta estimation
+OLS_syn_betas
+as.vector(OLS_syn_fit$betas)
+```
+
+Simulations for GLS fitting tests:
+
+```{r}
+# Generate Data
+
+GLS_syn_data <- generate_data(1000, GLS = T)
+GLS_syn_yields <- GLS_syn_data$test_data
+GLS_syn_betas <- GLS_syn_data$betas
+GLS_syn_cov_mat <- GLS_syn_data$cov_mat
+# Fit using OLS
+
+GLS_syn_fit <- fit_nelson_siegel_GLS(GLS_syn_yields,
+                                 int_knots = std_int_knots20,
+                                 lambda = 0.5,
+                                 start = 1,
+                                 T_ = 1000)
+# Check for covariance estimation
+
+GLS_syn_cov_mat
+GLS_syn_fit$cov_mat
+
+# Check for beta estimation
+GLS_syn_betas
+as.vector(GLS_syn_fit$betas)
+```
+
+The following function can be used to calculate profile likelihood of $\lambda$ parameter
+
+NEEDS TO BE MODIFIED, MANNY IS WORKING ON IT
+```{r}
+get_likelihood <- function(yield_list, lambda_list,start = 1, T_ = 5, GLS = T) {
+  likelihoods <- numeric(length(lambda_list)) 
+  log_likelihoods <- numeric(length(lambda_list))
+  test_likelihoods <- numeric(length(lambda_list))
+  if(GLS == F){
+    for(i in seq_along(lambda_list)) {
+      lambda <- lambda_list[i]
+      
+      fit_model <- fit_nelson_siegel(yield_list, lambda = lambda, start = start, T_ = T_, spline = FALSE)
+      
+      betas <- fit_model$betas
+      sigma_hat <- fit_model$sigma
+      Phi <- fit_model$Phi
+      e <- fit_model$eps
+      
+      N <- length(yield_list[[1]]) * T_
+      likelihoods[i] <- (1/(2*pi*sigma_hat^2))*exp(-N/2) # likelihood
+      log_likelihoods[i] <- log((1/(2*pi*sigma_hat^2))*exp(-N/2)) # log_likelihood
+    }
+  } else {
+    for(i in seq_along(lambda_list)) {
+      lambda <- lambda_list[i]
+      
+      fit_model <- fit_nelson_siegel_GLS(yield_list, lambda = lambda, start = start, T_ = T_, spline = FALSE)
+      
+      betas <- fit_model$betas
+      cov_mat <- fit_model$cov_matrix
+      Phi <- fit_model$Phi
+      e <- fit_model$eps
+      
+      N <- length(yield_list[[1]]) * T_
+      likelihoods[i] <- (1/(2*pi*det(cov_mat)))*exp(-N/2) # likelihood
+      log_likelihoods[i] <- log((1/(2*pi*det(cov_mat)))*exp(-N/2))
+    }
+  }
+    
+  return(list(likelihoods = likelihoods, log_likelihoods = log_likelihoods))
+}
+```
+
+NEEDS FIXING, MANNY AND TONY ARE WORKING ON IT
+
+```{r}
+fit_NS_parameters <- function(yield_list, lambda_list = seq(0.1, 0.6, 0.01), int_knots = std_int_knots, GLS = FALSE, static = TRUE, row_idx = seq(1, 241, 40), start, T_, spline = TRUE) {
+  fit_obj <- list() 
+  likelihoods <- numeric(length(lambda_list))
+  
+  if(GLS){
+    i 
+    for(i in seq_along(lambda_list)) { 
+      fit_obj[[i]] <- fit_nelson_siegel_GLS(yield_list = yield_list, int_knots = int_knots, lambda_list[i], row_idx = row_idx, start = start, T_ = T_, avg_cov = NULL, spline = spline, static = static)
+
+    }
+  }else{
+
+    for(i in seq_along(lambda_list)) { 
+      fit_obj[[i]] <- fit_nelson_siegel(yield_list, int_knots = std_int_knots, lambda_list[i], row_idx = row_idx, start = start, T_ = T_, spline = spline, static = static)
+
+    }
+  }
+  N <- length(yield_list[[1]]$Maturity)
+  n <- N * T_ # total number of observations
+  if(GLS){
+    for(i in 1:length(fit_obj)){
+      sigma_hat <- fit_obj[[i]]$sigma
+      likelihoods[i] <- (1/((2*pi)^N*det(sigma_hat)))^(1/2)
+    }
+  } else {
+    for(i in 1:length(fit_obj)){
+      sigma_hat <- fit_obj[[i]]$sigma
+      likelihoods[i] <- (1/((2*pi)^N*sigma_hat^2))^(T_2)
+    }
+  }
+  
+  best_fit <- fit_obj[[which.max(likelihoods)]]
+  return(list(betas = best_fit$betas, sigma = best_fit$sigma, lambda = best_fit$lambda, Phi = best_fit$Phi, eps = best_fit$eps))
+}
+```
+
+
+
+
+
+```{r}
+compute_yield <- function(maturity, betas,lambda, cov_matrix = FALSE) { # show no points
+  term1 <- betas[1]
+  term2 <- betas[2] * ((1 - exp(-lambda * maturity)) / (lambda * maturity))
+  term3 <- betas[3] * (((1 - exp(-lambda * maturity)) / (lambda * maturity)) - exp(-lambda * maturity))
+  yield <- term1 + term2 + term3
+  return(yield)
+}
+
+
+plot_fitted_NS <- function(yield_list, lambda = 0.5, start = 1, T_ = 20, spline = F) {
+  OLS_simulated_fit <- fit_nelson_siegel(yield_list, lambda = 0.5, start, T_ = 20, spline = spline)
+  computed_yields <- data.frame(Maturity = seq(1/12,20,length.out=100),
+                              ZERO_YLD1 = compute_yield( seq(1/12,20,length.out=100),
+                                                          OLS_simulated_fit$betas, 0.5,
+                                                          matrix(0, nrow = 100, ncol = 100)))
+  computed_yields$source <- 'fitted'
+  ggplot() + geom_line(data = computed_yields, aes(x = Maturity, y = ZERO_YLD1, color = source))
+  
+}
+```
+
+
+
+```{r}
+plot_maturity_3C <- function(yield_list) {
+  gbu <- do.call(cbind, lapply(yield_list, function(df) df$ZERO_YLD1))  # Combine data
+  rownames(gbu) <- yield_list[[1]]$Maturity  # Maturities as row names
+  start_dates <- lapply(yield_list, function(df) unique(df$START_DT))
+  start_dates_vector <- unlist(start_dates)
+  dates_as_date <- as.Date(as.character(start_dates_vector), format = "%Y%m%d")
+  # Correct the axes
+  p <- plot_ly(
+    z = ~gbu,
+    x = as.numeric(rownames(gbu)),  # Maturity on x-axis
+    y = dates_as_date,      # Time Period on y-axis
+    colors = colorRampPalette(c("blue", "green", "red"))(10)  # Color scheme
+  ) %>%
+    add_surface() %>%
+    layout(
+      title = "Simulated Nelson-Siegel Yield Curve<br />3D Surface Plot",
+      scene = list(
+        xaxis = list(
+          title = "Maturity (Years)",
+          gridcolor = "rgb(255, 255, 255)",
+          zerolinecolor = "rgb(255, 255, 255)",
+          showbackground = TRUE,
+          backgroundcolor = "rgb(240, 240, 240)"
+        ),
+        yaxis = list(
+          title = "Start Date",
+          gridcolor = "rgb(255, 255, 255)",
+          zerolinecolor = "rgb(255, 255, 255)",
+          showbackground = TRUE,
+          backgroundcolor = "rgb(230, 230, 230)"
+        ),
+        zaxis = list(
+          title = "Yield (Percent)",
+          gridcolor = "rgb(255, 255, 255)",
+          zerolinecolor = "rgb(255, 255, 255)",
+          showbackground = TRUE,
+          backgroundcolor = "rgb(220, 220, 220)"
+        )
+      )
+    )
+
+  # Display the plot
+  p
+}
+
+plot_maturity_3C(date_list)
+
+```
