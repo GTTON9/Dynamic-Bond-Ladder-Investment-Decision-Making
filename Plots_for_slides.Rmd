@@ -1,0 +1,222 @@
+---
+title: "Plots_For_Slides"
+output: html_document
+date: "2024-11-25"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This document will use the functions in the previous document to plot stuff for the presentation
+
+Profile likelihood plots
+```{r}
+Prof_lik_OLS <- generate_data(500, GLS = F)$test_data
+
+# For GLS
+lists_for_plots <- list()
+k <- 1
+
+colores <- c('red',
+               'orange',
+               'green',
+               'blue',
+               'black'
+               )
+labels_ <- paste('Time Window:', as.character(time_windows))
+time_windows <- c(10, 30, 50, 80, 120)
+print(labels_[1])
+for(i in time_windows){
+  
+  l <- get_likelihood(yield_list = Prof_lik_OLS,
+                                         lambda_list = seq(0.2, 0.7, 0.005),
+                                         start = 1,
+                                         T_ = i,
+                                         GLS = F,
+                                         tenors = c(seq(1/12, 20,10/3), 20))
+  lks <- l$log_likelihoods
+  lambda <- l$lambda
+  l_grid <- l$lambda_grid
+  gdf <- data.frame(lambda = l_grid, log_likelihood = lks)
+  if(k == 1){
+    g <- ggplot() 
+  }
+  g <- g + 
+    geom_line(data = gdf, aes(x = lambda, y = log_likelihood, color = labels_[k])) + 
+    geom_vline(xintercept = lambda, color = colores[k], linetype = 'dashed')
+  lists_for_plots[[k]] <- list(log_lik = lks, lambda = lambda, l_grid = l_grid)
+  if(k == length(colores)){
+    print('aaaaa')
+    g <- g + scale_color_manual(values = c('Time Window: 10' = 'red',
+                                           'Time Window: 30' = 'orange',
+                                           'Time Window: 50' = 'green',
+                                           'Time Window: 80' = 'blue',
+                                           'Time Window: 120' = 'black')) + labs(colors = 'a')
+  }
+  k <- k + 1
+}
+lists_for_plots
+g
+
+```
+
+
+```{r}
+# Set up variables
+Prof_lik_OLS <- generate_data(500, GLS = F)$test_data
+lists_for_plots <- list()
+k <- 1
+
+colores <- c('red', 'orange', 'green', 'blue', 'black')
+time_windows <- c(10, 30, 50, 80, 120)
+labels_ <- paste('Time Window:', as.character(time_windows))
+
+# Initialize the ggplot object
+g <- ggplot()
+
+# Loop through time windows and add lines
+for (i in seq_along(time_windows)) {
+  T_ <- time_windows[i]
+  
+  # Get likelihood data
+  l <- get_likelihood(
+    yield_list = Prof_lik_OLS,
+    lambda_list = seq(0.2, 0.7, 0.005),
+    start = 1,
+    T_ = T_,
+    GLS = F,
+    tenors = c(seq(1/12, 20, 10/3), 20)
+  )
+  
+  # Extract likelihood and lambda grid
+  lks <- l$log_likelihoods
+  lambda <- l$lambda
+  l_grid <- l$lambda_grid
+  gdf <- data.frame(lambda = l_grid, log_likelihood = lks)
+  
+  # Add the line to the plot with the corresponding label and color
+  g <- g + 
+    geom_line(
+      data = gdf, 
+      aes(x = lambda, y = log_likelihood, color = labels_[i]), 
+      size = 1
+    ) + 
+    geom_vline(xintercept = lambda, color = colores[i], linetype = 'dashed')
+  
+  # Store data for further use
+  lists_for_plots[[k]] <- list(log_lik = lks, lambda = lambda, l_grid = l_grid)
+  k <- k + 1
+}
+
+# Add manual color scale and legend
+g <- g + 
+  scale_color_manual(
+    values = setNames(colores, labels_)
+  ) + 
+  labs(color = 'Time Windows') +
+  theme_minimal() +
+  ggtitle("Log-Likelihoods for Different Time Windows")
+
+# Print the plot
+print(g)
+
+```
+
+```{r}
+
+# Set up variables
+Prof_lik_OLS <- generate_data(500, GLS = F)$test_data
+lists_for_plots <- list()
+k <- 1
+
+colores <- c('red', 'orange', 'green', 'blue', 'black')
+time_windows <- c(10, 30, 50, 80, 120)
+labels_ <- paste('Time Window:', as.character(time_windows))
+
+# Initialize the ggplot object
+g <- ggplot()
+
+# Loop through time windows and add lines
+for (i in seq_along(time_windows)) {
+  T_ <- time_windows[i]
+  
+  # Get likelihood data
+  l <- get_likelihood(
+    yield_list = Prof_lik_OLS,
+    lambda_list = seq(0.2, 0.7, 0.005),
+    start = 1,
+    T_ = T_,
+    GLS = F,
+    tenors = c(seq(1/12, 20, 10/3), 20)
+  )
+  
+  # Extract likelihood and lambda grid
+  lks <- l$log_likelihoods
+  lambda <- l$lambda
+  l_grid <- l$lambda_grid
+  gdf <- data.frame(lambda = l_grid, log_likelihood = lks)
+  
+  # Add a column to the data for the color/label
+  gdf$label <- labels_[i]  # Create a column to store the time window label
+  
+  # Add the line to the plot with the corresponding label and color
+  g <- g + 
+    geom_line(
+      data = gdf, 
+      aes(x = lambda, y = log_likelihood, color = label), 
+      size = 1
+    ) + 
+    geom_vline(xintercept = lambda, color = colores[i], linetype = 'dashed')
+  
+  # Store data for further use
+  lists_for_plots[[k]] <- list(log_lik = lks, lambda = lambda, l_grid = l_grid)
+  k <- k + 1
+}
+
+# Add manual color scale and legend
+g <- g + 
+  scale_color_manual(
+    values = setNames(colores, labels_)
+  ) + 
+  labs(color = 'Time Windows') +
+  theme_minimal() +
+  ggtitle("Log-Likelihoods for Different Time Windows")
+
+# Print the plot
+print(g)
+
+```
+
+Nelson-Siegel basis functions for different values of $\lambda$
+```{r}
+lam1 <- 0.7 
+tau_1_20 <- seq(1/12, 20, 1/12)
+nsdf1 <- data.frame(tau = tau_1_20,
+                    phi1 = rep(1,240))
+nsdf2 <- data.frame(tau = tau_1_20,
+                    phi2 = (1-exp(-tau_1_20*lam1))/(lam1*tau_1_20))
+nsdf3 <- data.frame(tau = tau_1_20,
+                    phi3 = (1-exp(-tau_1_20*lam1))/(lam1*tau_1_20) - exp(-lam1 * tau_1_20))
+ggplot() + 
+  geom_line(data = nsdf1, aes(x = tau, y = phi1), color = 'blue') + 
+  geom_line(data = nsdf2, aes(x = tau, y = phi2), color = 'red', linetype = 'dashed') +
+  geom_line(data = nsdf3, aes(x = tau, y = phi3), color = 'black', linetype = 'dotted')
+```
+
+```{r}
+
+lam2 <- 0.3
+tau_1_20 <- seq(1/12, 20, 1/12)
+nsdf1 <- data.frame(tau = tau_1_20,
+                    phi1 = rep(1,240))
+nsdf2 <- data.frame(tau = tau_1_20,
+                    phi2 = (1-exp(-tau_1_20*lam2))/(lam2*tau_1_20))
+nsdf3 <- data.frame(tau = tau_1_20,
+                    phi3 = (1-exp(-tau_1_20*lam2))/(lam2*tau_1_20) - exp(-lam2 * tau_1_20))
+ggplot() + 
+  geom_line(data = nsdf1, aes(x = tau, y = phi1), color = 'blue') + 
+  geom_line(data = nsdf2, aes(x = tau, y = phi2), color = 'red', linetype = 'dashed') +
+  geom_line(data = nsdf3, aes(x = tau, y = phi3), color = 'black', linetype = 'dotted')
+
+```
