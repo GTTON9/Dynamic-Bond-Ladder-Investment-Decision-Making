@@ -11,117 +11,6 @@ knitr::opts_chunk$set(echo = TRUE)
 This document will use the functions in the previous document to plot stuff for the presentation
 
 Profile likelihood plots
-```{r}
-Prof_lik_OLS <- generate_data(500, GLS = F)$test_data
-
-# For GLS
-lists_for_plots <- list()
-k <- 1
-
-colores <- c('red',
-               'orange',
-               'green',
-               'blue',
-               'black'
-               )
-labels_ <- paste('Time Window:', as.character(time_windows))
-time_windows <- c(10, 30, 50, 80, 120)
-print(labels_[1])
-for(i in time_windows){
-  
-  l <- get_likelihood(yield_list = Prof_lik_OLS,
-                                         lambda_list = seq(0.2, 0.7, 0.005),
-                                         start = 1,
-                                         T_ = i,
-                                         GLS = F,
-                                         tenors = c(seq(1/12, 20,10/3), 20))
-  lks <- l$log_likelihoods
-  lambda <- l$lambda
-  l_grid <- l$lambda_grid
-  gdf <- data.frame(lambda = l_grid, log_likelihood = lks)
-  if(k == 1){
-    g <- ggplot() 
-  }
-  g <- g + 
-    geom_line(data = gdf, aes(x = lambda, y = log_likelihood, color = labels_[k])) + 
-    geom_vline(xintercept = lambda, color = colores[k], linetype = 'dashed')
-  lists_for_plots[[k]] <- list(log_lik = lks, lambda = lambda, l_grid = l_grid)
-  if(k == length(colores)){
-    print('aaaaa')
-    g <- g + scale_color_manual(values = c('Time Window: 10' = 'red',
-                                           'Time Window: 30' = 'orange',
-                                           'Time Window: 50' = 'green',
-                                           'Time Window: 80' = 'blue',
-                                           'Time Window: 120' = 'black')) + labs(colors = 'a')
-  }
-  k <- k + 1
-}
-lists_for_plots
-g
-
-```
-
-
-```{r}
-# Set up variables
-Prof_lik_OLS <- generate_data(500, GLS = F)$test_data
-lists_for_plots <- list()
-k <- 1
-
-colores <- c('red', 'orange', 'green', 'blue', 'black')
-time_windows <- c(10, 30, 50, 80, 120)
-labels_ <- paste('Time Window:', as.character(time_windows))
-
-# Initialize the ggplot object
-g <- ggplot()
-
-# Loop through time windows and add lines
-for (i in seq_along(time_windows)) {
-  T_ <- time_windows[i]
-  
-  # Get likelihood data
-  l <- get_likelihood(
-    yield_list = Prof_lik_OLS,
-    lambda_list = seq(0.2, 0.7, 0.005),
-    start = 1,
-    T_ = T_,
-    GLS = F,
-    tenors = c(seq(1/12, 20, 10/3), 20)
-  )
-  
-  # Extract likelihood and lambda grid
-  lks <- l$log_likelihoods
-  lambda <- l$lambda
-  l_grid <- l$lambda_grid
-  gdf <- data.frame(lambda = l_grid, log_likelihood = lks)
-  
-  # Add the line to the plot with the corresponding label and color
-  g <- g + 
-    geom_line(
-      data = gdf, 
-      aes(x = lambda, y = log_likelihood, color = labels_[i]), 
-      size = 1
-    ) + 
-    geom_vline(xintercept = lambda, color = colores[i], linetype = 'dashed')
-  
-  # Store data for further use
-  lists_for_plots[[k]] <- list(log_lik = lks, lambda = lambda, l_grid = l_grid)
-  k <- k + 1
-}
-
-# Add manual color scale and legend
-g <- g + 
-  scale_color_manual(
-    values = setNames(colores, labels_)
-  ) + 
-  labs(color = 'Time Windows') +
-  theme_minimal() +
-  ggtitle("Log-Likelihoods for Different Time Windows")
-
-# Print the plot
-print(g)
-
-```
 
 ```{r}
 
@@ -188,20 +77,43 @@ print(g)
 
 ```
 
+```{r}
+ten_year_zcb <- clean_yield_raw[,6][1:1000]
+acf(ten_year_zcb)
+fit_10yrzcb <- auto.arima(ten_year_zcb)
+plot(forecast(fit_10yrzcb, h = 100), main = 'Prediction for 3-year ZCB spot rate'
+     ,xlab = 'Days after Jan 2, 1962')
+```
+
 Nelson-Siegel basis functions for different values of $\lambda$
 ```{r}
-lam1 <- 0.7 
+lam1 <- 0.2 
 tau_1_20 <- seq(1/12, 20, 1/12)
 nsdf1 <- data.frame(tau = tau_1_20,
-                    phi1 = rep(1,240))
+                    phi1 = rep(1,240),
+                    basis = 'level')
 nsdf2 <- data.frame(tau = tau_1_20,
-                    phi2 = (1-exp(-tau_1_20*lam1))/(lam1*tau_1_20))
+                    phi2 = (1-exp(-tau_1_20*lam1))/(lam1*tau_1_20),
+                    basis = 'slope')
 nsdf3 <- data.frame(tau = tau_1_20,
-                    phi3 = (1-exp(-tau_1_20*lam1))/(lam1*tau_1_20) - exp(-lam1 * tau_1_20))
+                    phi3 = (1-exp(-tau_1_20*lam1))/(lam1*tau_1_20) - exp(-lam1 * tau_1_20),
+                    basis = 'curvature')
 ggplot() + 
-  geom_line(data = nsdf1, aes(x = tau, y = phi1), color = 'blue') + 
-  geom_line(data = nsdf2, aes(x = tau, y = phi2), color = 'red', linetype = 'dashed') +
-  geom_line(data = nsdf3, aes(x = tau, y = phi3), color = 'black', linetype = 'dotted')
+  geom_line(data = nsdf1, aes(x = tau, y = phi1, color = basis), size = 1) + 
+  geom_line(data = nsdf2, aes(x = tau, y = phi2, color = basis), linetype = 'dashed', size = 1) +
+  geom_line(data = nsdf3, aes(x = tau, y = phi3, color = basis), linetype = 'longdash', size = 1) + ggtitle('Level, Slope, and Curvature basis functions for the NS model') + labs(x = 'Tau', y = '')
+
+
+```
+NS plot with $\beta = \begin{bmatrix} 4 \\1 \\-5 \end{bmatrix}$ and $\lambda = 0.25$
+
+```{r}
+sim_NS_plot<- generate_data(1, c(4,1,-5), 0.25, F, c(1/4, 1,2,3,5,10,20))$test_data[[1]]
+df_NS_plot <- data.frame(Tau = seq(1/12,20,1/12),
+                         yt =compute_yield(seq(1/12,20,1/12), c(4,1,-5), 0.25))
+ggplot() + 
+  geom_line(data = df_NS_plot, aes(x = Tau, y = yt), col = 'red', size= 0.5, linetype = 'longdash') + 
+  geom_point(data = sim_NS_plot, aes(x = Maturity, y = ZERO_YLD1), size = 0.75) + ggtitle('Yield Curve Generated Under Nelson Siegel')
 ```
 
 ```{r}
@@ -217,6 +129,19 @@ nsdf3 <- data.frame(tau = tau_1_20,
 ggplot() + 
   geom_line(data = nsdf1, aes(x = tau, y = phi1), color = 'blue') + 
   geom_line(data = nsdf2, aes(x = tau, y = phi2), color = 'red', linetype = 'dashed') +
-  geom_line(data = nsdf3, aes(x = tau, y = phi3), color = 'black', linetype = 'dotted')
+  geom_line(data = nsdf3, aes(x = tau, y = phi3), color = 'black', linetype = 'longdash')
+
+```
+
+Plot a time series on a single tenor just for graphic purposes
+
+```{r}
+ten_year_yields <- data[which(data$Maturity == 10),][c(1,3)][1:30,]
+install.packages('forecast')
+library(forecast)
+plot(ten_year_yields$ZERO_YLD1) 
+fit <- ets(ten_year_yields$ZERO_YLD1)
+plot(predict(fit, h = 10), main = 'Time Series of 10-year ZCB spot rate', xlab = 'Days after 09-03-2024')
+
 
 ```
