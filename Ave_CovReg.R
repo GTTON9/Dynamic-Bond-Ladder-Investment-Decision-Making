@@ -212,6 +212,8 @@ CovReg <- setRefClass(
 
 # Example of usage:
 # Create some dummy data to test the class
+set.seed(10)
+
 X1 <- matrix(runif(50), nrow = 5, ncol = 10)
 X2 <- matrix(runif(30), nrow = 3, ncol = 10)
 Y <- matrix(runif(20), nrow = 2, ncol = 10)
