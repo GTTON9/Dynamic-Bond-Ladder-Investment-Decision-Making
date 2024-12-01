@@ -529,7 +529,7 @@ get_likelihood(yield_list = interp_Lik_yields,
 Try playing around with it by using different tenors for NS parameter fitting.
 Use interpolated_list function to fitting using tenors not found in original (synthetic) data
 ```{r}
-fit_NS_parameters <- function(yield_list, lambda_list = seq(0.1, 0.6, 0.01), GLS = FALSE, static = TRUE, start, T_, tenors = c(1/12, 3, 6, 9, 12, 16, 20)) {
+fit_NS_parameters <- function(yield_list, lambda_list = seq(0.1, 0.6, 0.01), GLS = FALSE, start, T_, tenors = c(1/12, 3, 6, 9, 12, 16, 20)) {
   fit_obj <- list() 
   log_liks_list <- get_likelihood(yield_list = yield_list,
                                                   lambda_list = lambda_list,
