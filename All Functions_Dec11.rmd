@@ -1,0 +1,509 @@
+---
+title: "All Functions"
+format: pdf
+---
+
+```{r}
+#install.packages("tintytex")
+# library(tinytex)
+# install.packages("xelatex")
+#tinytex::tinytex_root()
+# tinytex::tlmgr_update()
+# xelatex --version
+library(tibble)
+library(MASS)
+library(ggplot2)
+library(ggthemes)
+```
+
+This file stores all the functions.
+
+## Spline
+
+This is an implementation of the Cox-deBoor recursion. source: https://cran.r-project.org/web/packages/crs/vignettes/spline_primer.pdf
+
+```{r}
+basis <- function(x, degree, i, knots){
+  if(degree == 0){
+    B <- ifelse((x>=knots[i])&(x<knots[i+1]),1,0)
+  } else {
+    if((knots[degree + i] - knots[i]) == 0){
+      if(x != knots[i+degree]){
+        alpha1 <- 0
+      } else {
+        return(1)
+      }
+    } else {
+      alpha1 <- (x-knots[i])/(knots[degree+i] - knots[i])
+    }
+    if((knots[i+degree+1] - knots[i+1]) == 0){
+      if(x != knots[i+degree]){
+        alpha2 <- 0
+      } else {
+        return(1)
+      }
+    } else {
+      alpha2 <- (knots[i+degree+1] - x) / (knots[i+degree+1] - knots[i+1])
+    }
+    B <- alpha1 * basis(x, (degree-1), i, knots) + 
+      alpha2*basis(x, (degree-1), (i+1), knots)
+  }
+  return(B)
+}
+```
+
+Construct the matrix $\mathbf{B}$, column by column. Matrix $B$ contains the basis functions computed through the Cox-deBoor recursive formulas using the function defined in the codechunk above, evaluated at different times to maturity (rows) and at different knot intervals (columns). For more details, check FURM on canvas
+
+```{r}
+matrix_b <- function(x, degree=3, int_knots) { 
+  # the x argument takes in a vector of time values that 
+  # will be used to evaluate a design matrix of basis functions 
+  # the degree argument specifies the highest degree of polynomials for
+  # the basis functions
+  # the int_knots argument takes in a vector of knots that will be used 
+  # to determine the intervals of the piecewise function
+  bound_knots <- int_knots[c(1, length(int_knots))] # this line creates bound knots
+  knots <- c(rep(bound_knots[1], (degree+1)), int_knots[c(-1, -length(int_knots))], rep(bound_knots[2], (degree+1)))
+  # the line above adds a couple of extra knots to each end of the int_knots vector because of the Cox-deBoor recursion
+  K <- length(int_knots) + degree - 1 # number of columns in the Basis matrix
+  B.mat <- matrix(0,nrow = length(x), ncol = K) # initialize the matrix
+  for(j in 1:K) {
+    B.mat[,j] <- sapply(X = x, FUN = basis, degree = degree, i = j, knots = knots) # add each column, one by one
+  }
+  return(B.mat) # return the matrix
+}
+```
+
+$$
+\text{MSE}(\alpha|\mathbf{B}, r) = (r - \mathbf{B}\alpha)^T(r-\mathbf{B}\alpha)
+$$
+
+Using OLS (unpenalized)
+
+$$
+\alpha = (\mathbf{B}^T\mathbf{B})^{-1} \mathbf{B}^T r
+$$ where $r$ is a vector of yield rates
+
+Interpolation function: perform yield curve interpolation using basis splines
+
+```{r}
+interp_yc <- function(yield_list, int_knots, degree = 3, d, last_tenor){
+  # yield_list: parameter of the form of a list of data frames containing ZCB spot rate
+  # int knots: the interior knots used for b-spline construction
+  # degree: highest degree of polynomials for the basis functions
+  # d: the date chosen to interpolate from the list
+  # last_tenor: last tenor to interpolate in a day
+  yield_list[[d]] <- data.frame(Maturity = yield_list[[d]]$Maturity,
+                                ZERO_YLD1 = yield_list[[d]]$ZERO_YLD1)
+  yc_df_pre <- rbind(data.frame(Maturity = 0, ZERO_YLD1 = 0), na.omit(yield_list[[d]]))
+  last_row <- which(round(yc_df_pre$Maturity,3) == last_tenor)
+  yc_df <- yc_df_pre[1:last_row,]
+  yields <- c(0, yc_df$ZERO_YLD1)
+  maturities <- c(0, as.numeric(yc_df$Maturity))
+  x <- as.numeric(maturities) # maturity dates
+  B <- matrix_b(x, degree=degree, int_knots = int_knots) 
+  B_t_B <- t(B) %*% B
+  # B is the design matrix on which the least squares coefficients will be calculated
+  
+  alphas <- solve(B_t_B) %*% t(B) %*% yields # OLS Formula for coefficients
+  x2 <- seq(1/12, last_tenor, 1/12) # this range is used to simulate a continuous yield curve
+  B2 <- matrix_b(x2, degree = degree, int_knots = int_knots) 
+  # B2 is the matrix of basis functions but evaluated at a 'continuous' time (not really but close enough)
+  
+  interpolated_yields <- data.frame(Maturity = x2, ZERO_YLD1 = B2 %*% alphas) # create dataframes for plotting
+  og_yields <- data.frame(ttm = maturities, yield = yields)
+
+  return(interpolated_yields)
+}
+```
+
+Interpolate a list of data with different dates
+
+```{r}
+interpolate_list <- function(yield_list, start, T_, degree = 3){
+  # yield_list: Parameter of the form of a list of data frames containing ZCB spot rate
+  # start: starting date from the yield_list list
+  # T_: length of time window
+  # degree: highest degree of polynomials for the basis functions
+  interpolated_yc <- list()
+  k <- 1
+  for(i in start:(start + T_ - 1)){
+    lt_max <- max(yield_list[[i]]$Maturity) # This line of code basically chops all yields beyond 20
+    avail_ylds <- na.omit(yield_list[[i]]$ZERO_YLD1)
+    maturities <- yield_list[[i]]$Maturity
+    N <- length(avail_ylds)
+    if(N %in% c(5, 6)){
+      int_knots <- c(0, quantile(maturities, probs = c(0, 0.5, 1)))
+    } else if(N %in% c(7,8,9)){
+      int_knots <- c(0,quantile(maturities, probs = c(0, 0.33, 0.66, 1)))
+    } else if(N %in% 10:15){
+      int_knots <- c(0,quantile(maturities, probs = c(0, 0.25, 0.5, .75, 1)))
+    } else {
+      int_knots <- c(0,quantile(maturities, probs = c(0, 0.20, 0.4, .6, .8, 1)))
+    }
+    interpolated_yc[[k]] <- interp_yc(yield_list = yield_list,
+                                      int_knots = int_knots,
+                                      d = i,
+                                      last_tenor = lt_max,
+                                      degree = degree)[3:240,]
+    k <- k + 1
+  }
+  return(interpolated_yc)
+}
+```
+
+## Synthetic Data genration
+
+This function is used for Synthetic data Simulation. For OLS, we generate from a diagonal covariance matrix, and for GLS, we generate from Wishart covariance matrix where the parameter for Wishart distirubtion is obtain by real dataset.
+
+```{r}
+generate_data <- function(T_, betas = c(4, 0, -5), lambda = 0.5, GLS = T, seed = 123) {
+  # T_: length of time window
+  # betas: true betas to generate the data
+  # lambda: Individual lambda parameter for NS
+  # diag_cov: whether the covariance matrix is diagonal
+  # maturities: list of time to maturities
+  yield_list <- list() 
+  maturities <- c(1/12,3/12,6/12,1,2,3,5,7,10,20)
+  N <- length(maturities)
+  cov_matrix = NULL
+  sigma2 = NULL
+  # GLS setup with Wishart covariance matrix
+  if (GLS) {
+    df <- nrow(First_Ten_CovMat) #length(maturities)
+    spread_mat <- diag(10)
+    diag(spread_mat) <- diag(First_Ten_CovMat)
+    if(!is.null(seed)){
+      set.seed(seed)
+    }
+    cov_matrix <- rWishart(1, df = 10, Sigma = spread_mat/10)[,,1]
+  } else {
+    if(!is.null(seed)){
+      set.seed(seed)
+    }
+    sigma2 <- runif(1, 0.025, 0.075) ** 2
+    sigma <- sqrt(sigma2)
+  }
+  
+
+  for (j in 1:T_) {
+    # Fixed betas for simplicity
+      # Random epsilon
+
+    # Vectorized computation for ZERO_YLD1
+    term1 <- betas[1]
+    term2 <- betas[2] * ((1 - exp(-lambda * maturities)) / (lambda * maturities))
+    term3 <- betas[3] * (((1 - exp(-lambda * maturities)) / (lambda * maturities)) - exp(-lambda * maturities))
+
+    if (GLS) {
+      noise <- mvrnorm(1, mu = rep(0, N), Sigma = cov_matrix)
+    } else {
+      noise <- rnorm(N, mean = 0, sd = sigma)
+    }
+
+    ZERO_YLD1 <- term1 + term2 + term3 + noise
+
+    # Create dataset for current time point
+    data <- tibble(Maturity = maturities, ZERO_YLD1 = ZERO_YLD1)
+    yield_list[[j]] <- data
+
+  }
+
+  return(list(yield_list = yield_list, betas = betas, cov_mat = cov_matrix, sigma2 = sigma2, lambda = lambda))
+}
+```
+
+## Nelson Sigel Model & Parameter Estimation
+
+This is the code for NS over a time window, uses the algorithm of OLS
+
+```{r}
+# Fit and plot the fitted nelson siegel model
+# over a time window
+fit_nelson_siegel <- function(yield_list, lambda, start, tenors, T_){
+  # yield_list: Parameter of the form of a list of data frames containing ZCB spot rate
+  # lambda: Individual lambda parameter for NS
+  # start: starting date from the yield_list list
+  # tenors: list of time to maturities
+  # T_: length of time window
+
+  indices <- which(round(yield_list[[start]]$Maturity, 2) %in% round(tenors, 2))
+  maturities <- yield_list[[1]]$Maturity[indices]
+  N <- length(maturities)
+  
+  term1 <- 1
+  term2 <- (1 - exp(-maturities*lambda)) / (maturities*lambda)
+  term3 <- ((1 - exp(-maturities*lambda)) / (maturities*lambda)) - exp(-maturities*lambda)
+  Phi <- cbind(term1, term2, term3) # Construct Phi matrix for NS
+  
+  Y_mat <- matrix(0, nrow = N, # matrix of N by T, containing yields for each tenor (columns)
+                  ncol = T_) # where each column represents a different date
+  j <- 1
+  for(t in start:(start + T_- 1)){
+    Y_mat[,j] <- yield_list[[t]]$ZERO_YLD1[indices]
+    j <- j + 1
+    phitphi_1phit <- solve(t(Phi) %*% Phi, t(Phi)) # OLS for the coefficients for every single day
+    betas_t <- phitphi_1phit %*% Y_mat  
+    betas <- rowSums(betas_t) / T_ # average all coefficients
+    eps <- matrix(0, nrow = N, ncol = T_) # matrix of errors for each day (column) and each tenor (row)
+    for(t in 1:T_){
+      eps[,t] <- Y_mat[,t] - Phi %*% betas # Populate errors
+    }
+    sig_hat2 <- sum(as.vector(eps)^2) / (N * T_ - 3) # take mean squared error (MLE Estimator)
+  }
+
+  return(list(betas = betas, # fitted betas static: 1*3   dynamic: T*3
+              sigma2 = sig_hat2, # MSE
+              lambda = lambda, # lambda(input)
+              cov_mat_betas = sig_hat2 * solve(t(Phi) %*% Phi), # Nelson Siegel design matrix N*3
+              eps = eps,
+              Phi = Phi)) # residuals N*T
+  
+}
+```
+
+Uses iterative GLS
+
+```{r}
+fit_nelson_siegel_GLS <- function(yield_list, lambda, start, T_, tenors) {
+  # yield_list: Parameter of the form of a list of data frames containing ZCB spot rate
+  # lambda: Individual lambda parameter for NS
+  # start: starting date from the yield_list list
+  # tenors: list of time to maturities
+  # T_: length of time window
+  indices <- which(round(yield_list[[start]]$Maturity, 2) %in% round(tenors, 2))
+
+  max_iteration <- 10000 # max iteration
+  maturities <- yield_list[[1]]$Maturity[indices]
+  N <- length(maturities) # number of tenor
+  term1 <- 1
+  term2 <- (1 - exp(-maturities * lambda)) / (maturities * lambda)
+  term3 <- ((1 - exp(-maturities * lambda)) / (maturities * lambda)) - exp(-maturities * lambda)
+  Phi <- cbind(term1, term2, term3)
+  
+  # Initialize the matrix for observed yields (Y_mat)
+  Y_mat <- matrix(0, nrow = N, ncol = T_)
+  
+  # Populate Y_mat with yields for each tenor
+  j <- 1
+  for(t in start:(start + T_ - 1)) {
+    Y_mat[,j] <- yield_list[[t]]$ZERO_YLD1[indices]
+    j <- j + 1
+  }
+
+  avg_cov <- diag(N)
+  betas <- c(0, 0, 0) # initial beta
+
+  # Iterative GLS estimation
+  for (i in 1:max_iteration) {
+    # Transform Y and Phi for the GLS step
+    L <- t(chol(avg_cov))
+    Y_mat_trans <- solve(L, Y_mat)
+    Phi_trans <- solve(L, Phi)
+    
+    # Compute new betas by OLS case
+    phitphi_inv <- solve(t(Phi_trans) %*% Phi_trans)
+    betas_new <- rowMeans(phitphi_inv %*% t(Phi_trans) %*% Y_mat_trans)
+    # Check for convergence
+    #print(betas)
+    #print(betas_new)
+    if (sum((betas - betas_new)^2)/sum(betas^2) < 1e-3 && i > 1) {
+      betas <- betas_new
+      break
+    }
+    # Update betas
+    betas <- betas_new
+    fitted_yields <- Phi %*% betas  # compute the estimated beta
+    fitted_yields_matrix <- matrix(fitted_yields, nrow = N, ncol = T_, byrow = FALSE)
+    
+    # Compute residuals
+    eps <- Y_mat - fitted_yields_matrix
+    avg_cov <- eps %*% t(eps) / (T_ - 3)
+
+  }
+  
+  # Final sigma estimate based on residuals
+  sig_hat <- sum(eps^2) / (N * T_ - 3)
+  return(list(betas = betas, cov_mat = avg_cov, lambda = lambda, Phi = Phi, eps = eps))
+}
+```
+
+This is the function to obtain the best $\lambda$ from computing the profile likelihood
+
+```{r}
+get_likelihood <- function(yield_list, lambda_list, start = 1, T_, GLS = TRUE, tenors) {
+  # yield_list: Parameter of the form of a list of data frames containing ZCB spot rate
+  # lambda_list: grid of lambda
+  # start: starting date from the yield_list list
+  # T_: length of time window
+  # GLS: whether to use GLS algorithm
+  # tenors: list of time to maturities
+  
+  log_likelihoods <- numeric(length(lambda_list))
+  indices <- which(round(yield_list[[start]]$Maturity, 2) %in% round(tenors, 2))
+  grid_spacing <- lambda_list[2] - lambda_list[1]
+  N <- length(yield_list[[start]]$Maturity[indices])
+  MLL <- c()
+  lambda_MLE <- c()
+
+  if (!GLS) {
+    for (i in seq_along(lambda_list)) {
+      lambda <- lambda_list[i] 
+      fit_model <- fit_nelson_siegel(
+        yield_list, 
+        lambda = lambda, 
+        start = start, T_ = T_, tenors = tenors
+      ) # estimate the parameters for given lambda
+
+      betas <- fit_model$betas 
+      sigma_hat2 <- fit_model$sigma2
+      Phi <- fit_model$Phi
+      e <- fit_model$eps
+
+      # Calculate log-likelihood
+      log_likelihoods[i] <- -T_ / 2 * (N * log(2 * pi) + N * log(sigma_hat2)) - (N * T_) / 2
+
+      if (i >= 3) {
+        rel_diff <- abs((log_likelihoods[i] - log_likelihoods[i - 1]) / log_likelihoods[i - 1])
+        lag1_rel_diff <- abs((log_likelihoods[i - 1] - log_likelihoods[i - 2]) / log_likelihoods[i - 2])
+
+        if (rel_diff < grid_spacing / 100 && rel_diff < lag1_rel_diff) {
+          lambda_MLE <- append(lambda_MLE, lambda_list[i])
+          MLL <- append(MLL, log_likelihoods[i])
+        }
+      }
+    }
+
+    df_likelihood <- data.frame(lambda = lambda_list, log_likelihood = log_likelihoods)
+    lk_plot <- ggplot() +
+      geom_line(data = df_likelihood, aes(x = lambda, y = log_likelihood)) +
+      geom_vline(xintercept = lambda_MLE[1], color = "red", linetype = "dashed")
+
+  } else {
+    for (i in seq_along(lambda_list)) {
+      lambda <- lambda_list[i] 
+      fit_model <- fit_nelson_siegel_GLS(
+        yield_list = yield_list, 
+        lambda = lambda, 
+        start = start, T_ = T_, 
+        tenors = tenors
+      ) # fit model
+
+      betas <- fit_model$betas
+      cov_mat <- fit_model$cov_mat
+      Phi <- fit_model$Phi
+      e <- fit_model$eps
+
+      # Split log-likelihood calculation into components
+      comp_1 <- -T_ * (N * log(2 * pi) + log(det(cov_mat))) / 2
+      sum_comp_2 <- 0
+      for (t in 1:T_) {
+        sum_comp_2 <- sum_comp_2 + t(e[, t]) %*% solve(cov_mat) %*% e[, t] # iterate through dates
+      }
+      comp_2 <- -1 / 2 * sum_comp_2 
+      log_likelihoods[i] <- comp_1 + comp_2
+
+      if (i >= 3) {
+        rel_diff <- abs((log_likelihoods[i] - log_likelihoods[i - 1]) / log_likelihoods[i - 1])
+        lag1_rel_diff <- abs((log_likelihoods[i - 1] - log_likelihoods[i - 2]) / log_likelihoods[i - 2])
+
+        if (rel_diff < grid_spacing / 100 && rel_diff < lag1_rel_diff) {
+          lambda_MLE <- append(lambda_MLE, lambda_list[i])
+          MLL <- append(MLL, log_likelihoods[i])
+        }
+      }
+    }
+
+    df_likelihood <- data.frame(lambda = lambda_list, log_likelihood = log_likelihoods)
+    lk_plot <- ggplot() + 
+      geom_line(data = df_likelihood, aes(x = lambda, y = log_likelihood)) +
+      geom_vline(xintercept = lambda_MLE[1], color = "red", linetype = "dashed")
+  }
+
+  return(list(
+    lk_plot = lk_plot, 
+    log_likelihoods = log_likelihoods, 
+    max_log_likelihood = ifelse(length(MLL) > 0, MLL[1], NA),
+    lambda_grid = lambda_list, 
+    lambda = ifelse(length(lambda_MLE) > 0, lambda_MLE[1], NA)
+  ))
+}
+
+
+```
+
+
+```{r}
+fit_NS_parameters <- function(yield_list, lambda_list = seq(0.1, 0.6, 0.01), GLS = T, start, T_, tenors = c(1/12, 3, 6, 9, 12, 16, 20)) {
+  # yield_list: Parameter of the form of a list of data frames containing ZCB spot rate
+  # lambda_list: grid of lambda
+  # start: starting date from the yield_list list
+  # T_: length of time window
+  # GLS: whether use GLS algorithm
+  # tenors: list of time to maturities
+  fit_obj <- list() 
+  log_liks_list <- get_likelihood(yield_list = yield_list,
+                                                  lambda_list = lambda_list,
+                                                  start = start,
+                                                  T_ = T_,
+                                                  GLS = GLS,
+                                                  tenors = tenors)
+
+  log_liks <- log_liks_list$log_likelihoods
+  log_liks_plot <- log_liks_list$lk_plot
+  best_lambda <- log_liks_list$lambda
+  max_log_lik <- log_liks_list$max_log_likelihood
+  
+  if(GLS){
+    best_fit <- fit_nelson_siegel_GLS(yield_list = yield_list,
+                                      lambda = best_lambda,
+                                      start = start,
+                                      T_ = T_,
+                                      tenors = tenors)
+    return(list(lambda = best_lambda, log_likelihood = max_log_lik, betas = best_fit$betas))
+  } else {
+    best_fit <- fit_nelson_siegel(yield_list = yield_list,
+                                  lambda = best_lambda,
+                                  start = start,
+                                  T_ = T_,
+                                  tenors = tenors)
+    return(list(lambda = best_lambda, log_likelihood = max_log_lik, betas = best_fit$betas, sigma2 = best_fit$sigma2, cov_mat_betas = best_fit$cov_mat_betas, Phi = best_fit$Phi))
+  }
+}
+```
+
+```{r}
+interpolate_matrix <- function(input_matrix, n_interp = 60, chop_at = NULL) {
+  # Get dimensions of the input matrix
+  n_rows <- nrow(input_matrix)
+  n_input_cols <- ncol(input_matrix)
+  
+  # Calculate the number of columns in the output matrix
+  n_cols <- (n_input_cols - 1) * n_interp
+  
+  # Initialize the resulting matrix
+  interpolated_matrix <- matrix(0, nrow = n_rows, ncol = n_cols)
+  
+  # Fill in the interpolated matrix
+  current_col <- 1
+  for (col in 1:(n_input_cols - 1)) {
+    # Extract the current and next column
+    current <- input_matrix[, col]
+    nxt <- input_matrix[, col + 1]
+    
+    # Perform linear interpolation
+    for (step in 0:(n_interp - 1)) {
+      weight_current <- (n_interp - step) / n_interp
+      weight_next <- step / n_interp
+      interpolated_matrix[, current_col] <- weight_current * current + weight_next * nxt
+      current_col <- current_col + 1
+    }
+  }
+  # Add the last column of the input matrix to the result
+  if(!is.null(chop_at) && chop_at < n_cols){
+    interpolated_matrix <- interpolated_matrix[,1:chop_at]
+  }
+  return(interpolated_matrix)
+}
+```
+
