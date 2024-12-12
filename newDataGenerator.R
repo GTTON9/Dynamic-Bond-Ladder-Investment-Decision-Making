@@ -1,5 +1,6 @@
-#Nelson Siegel Functions
+library(pracma)
 
+#Nelson Siegel Functions
 NS <- function(tau,lam){
   
   return( matrix(c(rep(1,times = length(tau)),sapply(tau,function(x) (1-exp(-lam * x)) / (lam * x)),
@@ -70,15 +71,6 @@ windowGen <- function(period, periodCount, betaMat, covMat, lambda, tenors){
 
   
 # Tests
-
-myCovMat <- diag(diag(MannyResult)[1:10])
-
-
-betaMat <- matrix(c(4, 0, -5,
-                    3,2,-3,
-                    5,-7,8),nrow = 3,byrow = T)
-
-moreDat <- windowGen(20,3,betaMat,myCovMat,0.5,tenors = seq(2,20,2))
   
 # GLS Function
 
@@ -93,40 +85,48 @@ recurGLS <- function(datMat,lambda,tol = 0.05){
   init <- F
   X <- NS(tenors,lambda)
   
-  currBetas <- t(solve(t(X) %*% X) %*% t(X) %*% t(datMat))
+  currBetas <- rowMeans(solve(t(X) %*% X) %*% t(X) %*% t(datMat))
   
-  while(!init & currTol > tol){
+  while((!init) | (currTol > tol)){
     
-    currMat<- matrix(0,nrow = n,ncol = n)
-    for(i in 1:T_){
-      y <- datMat[i,]
-      
-      myMatEst <- currMat + covMatEst(datMat[i,],X,currBetas[i,])
-    }
+    e <- t(datMat) - as.vector(X %*% currBetas)
+    currMat <- e %*% t(e) / (T_ - 3)
     
-    myMatEst <- myMatEst / (n - 3)
-    
+
     if(!init){
       init = T
-      prevCov <- myMatEst
+      prevCov <- currMat
     }
     else{
-      currTol <- norm(myMatEst - prevCov) / norm(prevCov)
+      currTol <- norm(currMat - prevCov) / norm(prevCov)
     }
     
-    print(myMatEst)
-    L_m <- solve(t(chol(myMatEst)))
+    # om <- pinv(currMat)
+    
+    L_m <- solve(t(chol(currMat)))
 
     X_tilde <- L_m %*% X
     Y_tilde <- L_m %*% t(datMat)
-    currBetas <- t(solve(t(X_tilde) %*% X_tilde) %*% t(X_tilde) %*% Y_tilde)
+    currBetas <- rowMeans(solve(t(X_tilde) %*% X_tilde) %*% t(X_tilde) %*% Y_tilde)
+    
+    # currBetas <- rowMeans(solve(t(X) %*% om %*% X) %*% t(X) %*% om %*% t(datMat))
+    print(currTol)
   }
   
   return(currBetas)
 }
 
-finalCov <- (rWishart(1,10,myCovMat))[,,1]
-newDat <- generate_data(200,betas = c(4, 0, -5), covMat = finalCov,lambda = 0.5,
-                        tenors = seq(2,20,2))
-currBetas <- recurGLS(newDat,0.5,tol = 0.05)
+finalCov <- (rWishart(1,20,diag(diag(MannyResult))))[,,1] / 20
+newDat <- generate_data(100,betas = c(4, -5, 4), covMat = finalCov,lambda = 0.1,
+                        tenors = seq(1,20,1))
+
+betaMat <- matrix(c(4, 0, -5,
+                    3,2,-3,
+                    5,-7,8),nrow = 3,byrow = T)
+
+moreDat <- windowGen(100,3,betaMat,myCovMat,0.1,tenors = seq(2,20,2))
+
+currBetas <- recurGLS(moreDat,0.1,tol = 0.01)
+
+
 

@@ -10,7 +10,7 @@ source('B-Spline Functions.R')
 tenors <- c(1 / 12, 3 / 12, 6 / 12, 1, 2, 3, 5, 7, 10, 20, 30)
 
 ### Examination
-newTen <- seq(from = 1/12,to = 20,3)
+newTen <- c(1/12,3 / 12,6 / 12,seq(from = 1,to = 20,1))
 
 myKnots <- quantile(tenors,c(0,0.25,0.5,0.75,1))
 regX <- bSpline(newTen,myKnots)
@@ -64,4 +64,4 @@ myMat <- function(n){
   return(iniMat / (n - 3))
 }
 
-MannyResult <- myMat(20)
+MannyResult <- myMat(500)
