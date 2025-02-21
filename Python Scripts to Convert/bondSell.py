@@ -1,17 +1,31 @@
 class bondSell:
 
-    def __init__(self, unitsSold, bondObj):
-        self.unitsSold = unitsSold
+    def __init__(self, units, bondObj,date):
+        self.units = units
         self.bondObj = bondObj
+        self.name = 'sell'
+        self.date = date
         
     def getUnitsSold(self):
-        return self.unitsSold
+        return self.units
     
     def setUnitsSold(self,newUnits):
-        self.unitsSold = newUnits
+        self.units = newUnits
 
     def getBondObj(self):
         return self.bondObj
     
     def setBondObj(self,newObj):
         self.bondObj = newObj
+    
+    def getBondDate(self):
+        return self.date
+    
+    def setBondDate(self,newDate):
+        self.date = newDate
+    
+    def getName(self):
+        return self.name
+    
+    def setName(self, newName):
+        self.name = newName
