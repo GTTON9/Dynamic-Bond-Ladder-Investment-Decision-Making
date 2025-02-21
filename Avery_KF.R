@@ -2,59 +2,212 @@
 library(MTS)
 source("syntheticDataFuncs.R")
 
-n = 1000
-set.seed(20)
-betaMat <- getBetas()
-yieldMat <- getYields(betaMat)
+############################################### Tony Prep
 
-lam = 0.6915
-tenors <- c(1/12,3/12,6/12,1,2,3,5,7,10,20)
-C <- NS(tenors,lam)
+# Fix get_C
 
-
-y = yieldMat
-m_KF=matrix(NA,nrow = n,ncol = 3) 
-a_KF=matrix(NA,nrow = n,ncol = 3)  
-f_KF=list() 
-C_KF=list()
-R_KF=list() 
-Q_KF=list() 
-
-myVAR = VARMA(betaMat,p = 1)
-G = myVAR$Phi
-W = myVAR$Sigma
-
-#marginal distribution for first one
+KF_likelihood <-function(A, B, C, D, Q, R, last_Sig, y_t, cur_x){
+  
+  F_t <- C %*% (A %*% last_Sig %*% t(A) + B %*% Q %*% t(B)) %*% t(C) + D %*% R %*% t(D)
+  # print(last_Sig[1,1])
+  
+  e_t <- as.matrix(y_t - C %*% cur_x)
+  # print(cat("a",as.numeric(t(e_t) %*% ginv(F_t, 1e-4) %*% e_t)))
+  log_likelihood_t <- -0.5 * (log(det(F_t)) + t(e_t) %*% solve(F_t) %*% e_t )
+  
+  return(log_likelihood_t)
+} 
 
 
-time_record_KF_in_R=system.time(
-  for(ii in 1:1){
+#get_partial_R(last_x, last_Sig, cur_x, cur_Sig, last_partial_x_R, last_partial_Sig_R, F_t, e_t, A, B, C, D, Q, R)
+partial_G_approx <- function(A, B, C, D, Q, R, last_Sig, y_t, cur_x, h=1e-3){
+  log_likelihood_0 <- KF_likelihood(A, B, C, D, Q, R, last_Sig, y_t, cur_x)
+  grad_A <- matrix(0, nrow=nrow(A), ncol=ncol(A))
+  
+  for (i in 1:nrow(A)) {
+    for (j in 1:ncol(A)) {
+      # Create perturbed matrices
+      A_plus <- A
+      A_minus <- A
+
+      A_plus[i, j] <- A_plus[i, j] + h
+      A_minus[i, j] <- A_minus[i, j] - h
+
+      log_likelihood_plus <- KF_likelihood(A_plus, B, C, D, Q, R, last_Sig, y_t, cur_x)
+      log_likelihood_minus <- KF_likelihood(A_minus, B, C, D, Q, R, last_Sig, y_t, cur_x)
+
+      grad_A[i, j] <- (log_likelihood_plus - log_likelihood_minus) / (2 * h)
+    }
+  }
+  
+  
+  return(list(grad_A = grad_A, log_likelihood_0 = log_likelihood_0))
+}
+
+partial_W_approx <- function(A, B, C, D, Q, R, last_Sig, y_t, cur_x, h=1e-5){
+  log_likelihood_0 <- KF_likelihood(A, B, C, D, Q, R, last_Sig, y_t, cur_x)
+  
+  grad_Q <- matrix(0, nrow=nrow(Q), ncol=ncol(Q))
+  
+  for (i in 1:nrow(Q)) {
+    for (j in 1:ncol(Q)) {
+      # Create perturbed matrices
+      Q_plus <- Q
+      Q_minus <- Q
+      
+      Q_plus[i, j] <- Q_plus[i, j] + h
+      Q_minus[i, j] <- Q_minus[i, j] - h
+      
+      log_likelihood_plus <- KF_likelihood(A, B, C, D, Q_plus, R, last_Sig, y_t, cur_x)
+      log_likelihood_minus <- KF_likelihood(A, B, C, D, Q_minus, R, last_Sig, y_t, cur_x)
+      
+      grad_Q[i, j] <- (log_likelihood_plus - log_likelihood_minus) / (2 * h)
+    }
+  }
+  return(grad_Q)
+}
+
+partial_U_approx <- function(A, B, C, D, Q, R, last_Sig, y_t, cur_x, h=1e-5){
+  log_likelihood_0 <- KF_likelihood(A, B, C, D, Q, R, last_Sig, y_t, cur_x)
+  
+  grad_R <- matrix(0, nrow=nrow(R), ncol=ncol(R))
+  
+  for (i in 1:nrow(R)) {
+    for (j in 1:ncol(R)) {
+      # Create perturbed matrices
+      R_plus <- R
+      R_minus <- R
+      
+      R_plus[i, j] <- R_plus[i, j] + h
+      R_minus[i, j] <- R_minus[i, j] - h
+      
+      log_likelihood_plus <- KF_likelihood(A, B, C, D, Q, R_plus, last_Sig, y_t, cur_x)
+      log_likelihood_minus <- KF_likelihood(A, B, C, D, Q, R_minus, last_Sig, y_t, cur_x)
+      
+      # print(c(log_likelihood_plus,log_likelihood_minus))
+      
+      grad_R[i, j] <- (log_likelihood_plus - log_likelihood_minus) / (2 * h)
+    }
+  }
+  return(grad_R)
+}
+
+
+myFunc <- function(yieldMat,tenors,lam){
+  
+  C <- NS(tenors,lam)
+  B = diag(rep(1,3))
+
+
+  n = ncol(yieldMat)
+  tenorLen = nrow(yieldMat)
+  D = diag(rep(1,tenorLen))
+  
+  U = diag(rep(1,nrow(yieldMat))) # will be updated
+  
+  # For derivatives.
+  
+  partial_log_l_G <- diag(3)
+  partial_log_l_W <- diag(3)
+  partial_log_l_U <- diag(tenorLen)
+  
+  # Help with initialization.
+  
+  myVAR = VARMA(betaMat,p = 1)
+  G = myVAR$Phi # will be updated
+  W = myVAR$Sigma # will be updated
+  
+  
+  
+  while(TRUE){
+    m_KF=matrix(NA,nrow = 3,ncol = n) 
+    a_KF=matrix(NA,nrow = 3,ncol = n)  
+    f_KF=matrix(NA,nrow = tenorLen,ncol = n)
     
-    a_KF[1,]= c(0,0,0)
-    R_KF[[1]]= diag(rep(1,3))
-    f_KF[[1]]= C %*% t(t(a_KF[1,]))
-    Q_KF[[1]]= round(C %*% R_KF[[1]] %*% t(C) + <theCovMat>,4)
-    Q_KF_inv=solve(Q_KF[[1]])    ##1d ##solve(Q_KF[1])
-    m_KF[1,]=t(a_KF[1,]+R_KF[[1]] %*% t(featVectors[[1]]) %*% Q_KF_inv %*% (y[[1]]-f_KF[[1]]))
-    C_KF[[1]]=R_KF[[1]]-R_KF[[1]] %*% t(featVectors[[1]]) %*% Q_KF_inv %*% C %*% t(R_KF[[1]])
+    C_KF=matrix(NA,ncol = 3 * n,nrow = 3)
     
+    R_KF = matrix(NA,ncol = 3 * n,nrow = 3)
+    Q_KF = matrix(NA,ncol = tenorLen * n,nrow = tenorLen)
     
+    a_KF[,1]= c(0,0,0)
+    f_KF[,1]= C %*% a_KF[,1]
+    R_KF[1:3,1:3] <- diag(rep(1,3))
     
+    Q_KF[1:tenorLen,1:tenorLen] = C %*% R_KF[1:3,1:3] %*% t(C) + U
+    Q_KF_inv=solve(Q_KF[1:tenorLen,1:tenorLen])    ##1d ##solve(Q_KF[1])
+    m_KF[,1]=a_KF[,1]+ R_KF[1:3,1:3] %*% t(C) %*% Q_KF_inv %*% (yieldMat[,1]-f_KF[,1])
+    C_KF[1:3,1:3]= R_KF[1:3,1:3] - R_KF[1:3,1:3] %*% t(C) %*% Q_KF_inv %*% C %*% R_KF[1:3,1:3]
+    
+
     for(i in 2:n){
-      a_KF[i,]=G %*% m_KF[i-1,]
-      R_KF[[i]]=G %*% C_KF[[i-1]] %*% t(G) + W
+      a_KF[,i] = G %*% m_KF[,i-1]
       
-      f_KF[[i]]=C %*% a_KF[i,]
-      Q_KF[[i]]=round(C %*% R_KF[[i]] %*% t(C) + obsCovList[[i]],4)
       
-      Q_KF_inv= solve(Q_KF[[i]])
-      m_KF[i,]=a_KF[i,]+ R_KF[[i]] %*% t(C) %*% Q_KF_inv %*% (y[[i]]-f_KF[[i]])
-      C_KF[[i]]=R_KF[[i]]-R_KF[[i]] %*% t(C) %*% Q_KF_inv %*% C %*% R_KF[[i]]
+      R_KF[1:3,(1 + 3 * (i-2)):(3 * (i-1))] = G %*% C_KF[,(1 + 3 * (i-2)):(3 * 
+                               (i-1))] %*% t(G) + W
+      
+      f_KF[,i] = C %*% a_KF[,i]
+      Q_KF[(1:tenorLen),(1 + tenorLen * (i-2)):(tenorLen * (i-1))] = 
+        C %*% R_KF[1:3,(1 + 3 * (i-2)):(3 * 
+                               (i-1))] %*% t(C) + U
+      
+      Q_KF_inv= solve(Q_KF[(1:tenorLen),
+                           (1 + tenorLen * (i-2)):(tenorLen * (i-1))])
+      
+      m_KF[,i]= a_KF[,i]+ R_KF[1:3,(1 + 3 * (i-2)):(3 * (i-1))] %*% 
+        t(C) %*% Q_KF_inv %*% (yieldMat[,i] - f_KF[,i])
+      C_KF[1:3,(1 + 3 * (i-1)):(3 * i)] = 
+        R_KF[1:3,(1 + 3 * (i-2)):(3 * (i-1))] - 
+        R_KF[1:3,(1 + 3 * (i-2)):(3 * (i-1))] %*% 
+        t(C) %*% Q_KF_inv %*% C %*% R_KF[1:3,(1 + 3 * (i-2)):(3 * (i-1))]
+
+      
+      last_Sig = C_KF[1:3,(1 + 3 * (i-2)):(3 * (i-1))]
+      cur_x = m_KF[,i]
+      partial_log_G_t <- partial_G_approx(G, B, C, D, W, U, last_Sig = last_Sig, y_t = yieldMat[,i], cur_x = cur_x, h=1e-5)
+      partial_log_U_t <- partial_U_approx(G, B, C, D, W, U, last_Sig = last_Sig, y_t = yieldMat[,i], cur_x = cur_x, h=1e-5)
+      partial_log_W_t <- partial_W_approx(G, B, C, D, W, U, last_Sig = last_Sig, y_t = yieldMat[,i], cur_x = cur_x, h=1e-5)
+      # add the current time partial_log_likelihood to the summation of partial_log_likelihood over time 1:T_
+      partial_log_l_G <- partial_log_l_G + partial_log_G_t$grad_A
+      partial_log_l_U <- partial_log_l_U + partial_log_U_t
+      partial_log_l_W <- partial_log_l_W + partial_log_W_t
       
     }
+    lastG = G
+    lastW = W
+    lastU = U
     
+    alpha <- 0.0001
+    # update the 
+    
+    G <- G + alpha * partial_log_l_G
+    W <- W + alpha * partial_log_l_W
+    
+    U <- U + alpha * partial_log_l_U
+    
+    
+    # Compute the convergece condition by the ratio of difference of paramters, using Euclidean norm
+    # num <- norm(A - lastA, type = "F") + norm(Q - lastQ, type = "F") + norm(R - lastR, type = "F") # 
+    # denom <- norm(A, type = "F") + norm(Q, type = "F") + norm(R, type = "F")
+    # ratio <- num/denom
+    ratio_G <- norm(G - lastG, type = "F")/norm(G, type = "F")
+    ratio_W <- norm(W - lastW, type = "F")/norm(W, type = "F")
+    ratio_U <- norm(U - lastU, type = "F")/norm(U, type = "F")
+    ratio <- max(c(ratio_G, ratio_W, ratio_U))
+    print(ratio)
+    
+    if(ratio < 0.01){
+      break
+    }
+    
+    # parameter update for the next iteration
   }
-)
+  return(G) 
+}
+
+
+###############################################
+
 
 
 # smoother
@@ -75,4 +228,23 @@ time_record_KF_in_R=system.time(
 # sampleVar = c()
 # for(i in 1:100){
 #   sampleVar[i] = sum(diag(C_KF[[i]]) ^ 2)
-}
+
+
+n = 1000
+set.seed(20)
+betaMat <- getBetas()
+yieldMat <- getYields(betaMat)
+
+lam = 0.6915
+tenors <- c(1/12,3/12,6/12,1,2,3,5,7,10,20)
+
+y = t(yieldMat)
+
+
+G <- myFunc(y,tenors,lam = lam)
+
+
+
+
+
+# Extra: KF_Estimate_approx(data, 30, tenors = c(1/12,3/12,6/12,1,2,3,5,7,10,20), lambda = 0.5)
