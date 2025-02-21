@@ -56,9 +56,9 @@ def time_to_maturity(day_count_convention, trading_date, maturity_date):
     return time_to_maturity
 
 # Example usage
-trading_date = "2023-10-01"
-maturity_date = "2025-10-01"
-day_count_convention = "Actual/Actual"
+# trading_date = "2023-10-01"
+# maturity_date = "2025-10-01"
+# day_count_convention = "Actual/Actual"
 
-time_to_maturity_value = time_to_maturity(day_count_convention, trading_date, maturity_date)
-print(f"Time to maturity (in years): {time_to_maturity_value}")
+# time_to_maturity_value = time_to_maturity(day_count_convention, trading_date, maturity_date)
+# print(f"Time to maturity (in years): {time_to_maturity_value}")
