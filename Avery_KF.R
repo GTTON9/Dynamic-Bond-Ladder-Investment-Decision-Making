@@ -151,9 +151,10 @@ myFunc <- function(yieldMat,tenors,lam){
         C %*% R_KF[1:3,(1 + 3 * (i-2)):(3 * 
                                (i-1))] %*% t(C) + U
       
-      Q_KF_inv= solve(Q_KF[(1:tenorLen),
+      Q_KF_inv = solve(Q_KF[(1:tenorLen),
                            (1 + tenorLen * (i-2)):(tenorLen * (i-1))])
       
+
       m_KF[,i]= a_KF[,i]+ R_KF[1:3,(1 + 3 * (i-2)):(3 * (i-1))] %*% 
         t(C) %*% Q_KF_inv %*% (yieldMat[,i] - f_KF[,i])
       C_KF[1:3,(1 + 3 * (i-1)):(3 * i)] = 
@@ -163,7 +164,7 @@ myFunc <- function(yieldMat,tenors,lam){
 
       
       last_Sig = C_KF[1:3,(1 + 3 * (i-2)):(3 * (i-1))]
-      cur_x = m_KF[,i]
+      cur_x = a_KF[,i]
       partial_log_G_t <- partial_G_approx(G, B, C, D, W, U, last_Sig = last_Sig, y_t = yieldMat[,i], cur_x = cur_x, h=1e-5)
       partial_log_U_t <- partial_U_approx(G, B, C, D, W, U, last_Sig = last_Sig, y_t = yieldMat[,i], cur_x = cur_x, h=1e-5)
       partial_log_W_t <- partial_W_approx(G, B, C, D, W, U, last_Sig = last_Sig, y_t = yieldMat[,i], cur_x = cur_x, h=1e-5)
@@ -177,7 +178,7 @@ myFunc <- function(yieldMat,tenors,lam){
     lastW = W
     lastU = U
     
-    alpha <- 0.0001
+    alpha <- 0.00000001
     # update the 
     
     G <- G + alpha * partial_log_l_G
@@ -202,7 +203,7 @@ myFunc <- function(yieldMat,tenors,lam){
     
     # parameter update for the next iteration
   }
-  return(G) 
+  return(m_KF) 
 }
 
 
@@ -230,7 +231,7 @@ myFunc <- function(yieldMat,tenors,lam){
 #   sampleVar[i] = sum(diag(C_KF[[i]]) ^ 2)
 
 
-n = 1000
+n = 100
 set.seed(20)
 betaMat <- getBetas()
 yieldMat <- getYields(betaMat)
@@ -241,9 +242,12 @@ tenors <- c(1/12,3/12,6/12,1,2,3,5,7,10,20)
 y = t(yieldMat)
 
 
-G <- myFunc(y,tenors,lam = lam)
+estMat <- myFunc(y,tenors,lam = lam)
+C <- NS(tenors,lam)
 
-
+plot(tenors,y[,ncol(y)])
+lines(tenors,C %*% t(betaMat)[,ncol(t(betaMat))])
+lines(tenors,C %*% estMat[,ncol(estMat)], col = 'red')
 
 
 

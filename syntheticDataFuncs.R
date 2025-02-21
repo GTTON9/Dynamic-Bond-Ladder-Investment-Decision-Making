@@ -7,7 +7,7 @@ source('NS_Funcs.R')
 getBetas <- function(){
   iniBeta = c(4.5896,-1.9973, -1.1687)
   
-  A <- diag(c(0.9979,0.9777,0.9342))
+  A <- diag(c(0.9979,-0.9777,0.9342))
   
   myCovMat <- 1 / 30 * rWishart(1,3,diag(c(0.1988,0.2920,0.5947)))[,,1]
   
@@ -16,8 +16,8 @@ getBetas <- function(){
     A %*% currBeta + MASS::mvrnorm(mu = rep(0,3), Sigma = myCovMat)
     
   }
-  
-  n = 1000
+
+  n = 100
   betaMat <- matrix(ncol = 3, nrow = n)
   betaMat[1,] <- iniBeta
   currBeta <- iniBeta
