@@ -28,7 +28,7 @@ bondCounts <- setRefClass("bondCounts",
     },
     
     setBondDF = function(newBondDF) {
-      bondDF <<- newBondDF
+      bondDF <- newBondDF
     }
   )
 )
