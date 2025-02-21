@@ -28,7 +28,7 @@ bondCounts <- setRefClass("bondCounts",
     },
     
     setBondDF = function(newBondDF) {
-      bondDF <<- newBondDF
+      bondDF <- newBondDF
     }
   )
 )
@@ -42,10 +42,10 @@ bond2 <- bondType(0.04, '2023-01-01', '2033-01-01', 10, '30/360', FALSE)
 
 bc <- bondCounts()
 
-act1 <- bondBuy(5, 'Treasury', '2025-01-01')
-act2 <- bondSell(3, '', '2025-01-01')
-act3 <- bondSell(2, 'popo', '2025-01-03')
-act4 <- bondStrip(1, 'pene', '2026-01-03')
+act1 <- bondBuy(5, bond1, '2025-01-01')
+act2 <- bondSell(3, bond2, '2025-01-01')
+act3 <- bondSell(2, bond1, '2025-01-03')
+act4 <- bondStrip(1, bond2, '2026-01-03')
 
 bc$bondAction(act1)
 bc$bondAction(act2)
