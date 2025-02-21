@@ -1,0 +1,58 @@
+# Define the bondCounts class
+bondCounts <- setRefClass("bondCounts",
+  fields = list(
+    bondDF = "list"
+  ),
+  
+  methods = list(
+    initialize = function() {
+      .self$bondDF <<- list(Date = c(),
+                            bondType = c(),
+                            unitsTraded = c(),
+                            numberStripped = c())
+    },
+    
+    bondAction = function(doBondAction) {
+      bondActionKey <- c("buy" = 1, "sell" = -1, "strip" = 0)
+      
+      .self$bondDF$Date <- c(.self$bondDF$Date, doBondAction$getBondDate())
+      .self$bondDF$bondType <- c(.self$bondDF$bondType, doBondAction$getBondObj())
+      .self$bondDF$unitsTraded <- c(.self$bondDF$unitsTraded, 
+                                          doBondAction$getUnits() * bondActionKey[doBondAction$getName()])
+      .self$bondDF$numberStripped <- c(.self$bondDF$numberStripped,
+                                       ifelse(doBondAction$getName() == "strip", doBondAction$getUnits(), 0))
+    },
+    
+    getBondDF = function() {
+      return(bondDF)
+    },
+    
+    setBondDF = function(newBondDF) {
+      bondDF <<- newBondDF
+    }
+  )
+)
+
+# Example Usage
+
+
+bond1 <- bondType(0.03, '2023-03-06', '2024-03-06', 1, '30/365', TRUE)
+bond2 <- bondType(0.04, '2023-01-01', '2033-01-01', 10, '30/360', FALSE)
+
+
+bc <- bondCounts()
+
+act1 <- bondBuy(5, 'Treasury', '2025-01-01')
+act2 <- bondSell(3, '', '2025-01-01')
+act3 <- bondSell(2, 'popo', '2025-01-03')
+act4 <- bondStrip(1, 'pene', '2026-01-03')
+
+bc$bondAction(act1)
+bc$bondAction(act2)
+bc$bondAction(act3)
+bc$bondAction(act4)
+
+bc
+
+
+
