@@ -11,7 +11,13 @@ KF_likelihood <-function(A, B, C, D, Q, R, last_Sig, y_t, cur_x){
   F_t <- C %*% (A %*% last_Sig %*% t(A) + B %*% Q %*% t(B)) %*% t(C) + D %*% R %*% t(D)
   # print(last_Sig[1,1])
   
+  while(kappa(F_t) ^ -1 > 10 ^ -2){
+    F_t = F_t + 10 ^ -2
+    print(kappa(F_t))
+  }
+  
   e_t <- as.matrix(y_t - C %*% cur_x)
+  # print(e_t[1])
   # print(cat("a",as.numeric(t(e_t) %*% ginv(F_t, 1e-4) %*% e_t)))
   log_likelihood_t <- -0.5 * (log(det(F_t)) + t(e_t) %*% solve(F_t) %*% e_t )
   
@@ -142,11 +148,13 @@ myFunc <- function(yieldMat,tenors,lam){
     for(i in 2:n){
       a_KF[,i] = G %*% m_KF[,i-1]
       
+      f_KF[,i] = C %*% a_KF[,i]
+      
       
       R_KF[1:3,(1 + 3 * (i-2)):(3 * (i-1))] = G %*% C_KF[,(1 + 3 * (i-2)):(3 * 
                                (i-1))] %*% t(G) + W
       
-      f_KF[,i] = C %*% a_KF[,i]
+
       Q_KF[(1:tenorLen),(1 + tenorLen * (i-2)):(tenorLen * (i-1))] = 
         C %*% R_KF[1:3,(1 + 3 * (i-2)):(3 * 
                                (i-1))] %*% t(C) + U
@@ -154,9 +162,11 @@ myFunc <- function(yieldMat,tenors,lam){
       Q_KF_inv = solve(Q_KF[(1:tenorLen),
                            (1 + tenorLen * (i-2)):(tenorLen * (i-1))])
       
-
       m_KF[,i]= a_KF[,i]+ R_KF[1:3,(1 + 3 * (i-2)):(3 * (i-1))] %*% 
         t(C) %*% Q_KF_inv %*% (yieldMat[,i] - f_KF[,i])
+      
+      
+      
       C_KF[1:3,(1 + 3 * (i-1)):(3 * i)] = 
         R_KF[1:3,(1 + 3 * (i-2)):(3 * (i-1))] - 
         R_KF[1:3,(1 + 3 * (i-2)):(3 * (i-1))] %*% 
@@ -165,6 +175,7 @@ myFunc <- function(yieldMat,tenors,lam){
       
       last_Sig = C_KF[1:3,(1 + 3 * (i-2)):(3 * (i-1))]
       cur_x = a_KF[,i]
+
       partial_log_G_t <- partial_G_approx(G, B, C, D, W, U, last_Sig = last_Sig, y_t = yieldMat[,i], cur_x = cur_x, h=1e-5)
       partial_log_U_t <- partial_U_approx(G, B, C, D, W, U, last_Sig = last_Sig, y_t = yieldMat[,i], cur_x = cur_x, h=1e-5)
       partial_log_W_t <- partial_W_approx(G, B, C, D, W, U, last_Sig = last_Sig, y_t = yieldMat[,i], cur_x = cur_x, h=1e-5)
@@ -178,7 +189,7 @@ myFunc <- function(yieldMat,tenors,lam){
     lastW = W
     lastU = U
     
-    alpha <- 0.00000001
+    alpha <- 10 ^ -5
     # update the 
     
     G <- G + alpha * partial_log_l_G
@@ -195,8 +206,7 @@ myFunc <- function(yieldMat,tenors,lam){
     ratio_W <- norm(W - lastW, type = "F")/norm(W, type = "F")
     ratio_U <- norm(U - lastU, type = "F")/norm(U, type = "F")
     ratio <- max(c(ratio_G, ratio_W, ratio_U))
-    print(ratio)
-    
+
     if(ratio < 0.01){
       break
     }
@@ -239,15 +249,16 @@ yieldMat <- getYields(betaMat)
 lam = 0.6915
 tenors <- c(1/12,3/12,6/12,1,2,3,5,7,10,20)
 
-y = t(yieldMat)
+y = t(yieldMat) # |R| / |Q|
 
 
 estMat <- myFunc(y,tenors,lam = lam)
 C <- NS(tenors,lam)
 
-plot(tenors,y[,ncol(y)])
-lines(tenors,C %*% t(betaMat)[,ncol(t(betaMat))])
-lines(tenors,C %*% estMat[,ncol(estMat)], col = 'red')
+v = 50
+plot(tenors,y[,ncol(y) - v])
+lines(tenors,C %*% t(betaMat)[,ncol(t(betaMat)) - v])
+lines(tenors,C %*% estMat[,ncol(estMat) - v], col = 'red')
 
 
 

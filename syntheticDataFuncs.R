@@ -9,7 +9,7 @@ getBetas <- function(){
   
   A <- diag(c(0.9979,-0.9777,0.9342))
   
-  myCovMat <- 1 / 30 * rWishart(1,3,diag(c(0.1988,0.2920,0.5947)))[,,1]
+  myCovMat <- 1 / 3000 * rWishart(1,3,diag(c(0.1988,0.2920,0.5947)))[,,1]
   
   getNewBeta <- function(currBeta){
     
@@ -36,7 +36,7 @@ getBetas <- function(){
 getYields <- function(betaMat){
   lam = 0.6915
   tenors <- c(1/12,3/12,6/12,1,2,3,5,7,10,20)
-  obsCovMat <- 1 / length(tenors) * rWishart(1,length(tenors),diag(rep(0.05,length(tenors))))[,,1]
+  obsCovMat <- 1 / length(tenors) * rWishart(1,length(tenors),diag(rep(0.0005,length(tenors))))[,,1]
   C <- NS(tenors,lam)
   
   getYields <- function(currBeta){

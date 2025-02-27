@@ -5,6 +5,8 @@ format: pdf
 ```{r}
 library(tibble)
 library(MASS)
+
+# 5000 Samples
 ``` 
 
 
