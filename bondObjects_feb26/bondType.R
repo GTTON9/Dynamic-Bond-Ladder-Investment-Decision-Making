@@ -24,7 +24,7 @@ bondType <- setRefClass("bondType",
     },
     
     setCouponRate = function(newRate) {
-      couponRate <<- newRate
+      couponRate <- newRate
     },
     
     getIssueDate = function() {
@@ -32,7 +32,7 @@ bondType <- setRefClass("bondType",
     },
     
     setIssueDate = function(newDate) {
-      issueDate <<- newDate
+      issueDate <- newDate
     },
     
     getMaturityDate = function() {
@@ -40,7 +40,7 @@ bondType <- setRefClass("bondType",
     },
     
     setMaturityDate = function(newDate) {
-      maturityDate <<- newDate
+      maturityDate <- newDate
     },
     
     getCountingConvention = function() {
@@ -48,7 +48,23 @@ bondType <- setRefClass("bondType",
     },
     
     setCountingConvention = function(newConvention) {
-      countingConvention <<- newConvention
+      countingConvention <- newConvention
+    },
+    
+    getPeriod = function() {
+      return(period)
+    },
+    
+    setPeriod = function(newPeriod) {
+      period <- newPeriod 
+    },
+    
+    getCallable = function() {
+      return(callable)
+    },
+    
+    setCallable = function(newCallable) {
+      callable <- newCallable
     }
   )
 )

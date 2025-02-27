@@ -13,6 +13,7 @@ bondStrip <- setRefClass("bondStrip",
        .self$bondObj <<- bondObj
        .self$name <<- "strip"
        .self$date <<- as.Date(date)  # Convert input date to Date object
+       bondObj$hasCoupon <<- FALSE
      },
      
      getUnits = function() {
