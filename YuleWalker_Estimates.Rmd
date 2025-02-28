@@ -1,0 +1,119 @@
+---
+title: "yuleWalker_AR1"
+author: "Manny"
+date: "2025-02-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+interp252 <- interpolate_list(yields252,
+                 1, 100)
+
+tsBetas <- matrix(NA, nrow = 3, ncol = 100)
+for(i in 1:100) {
+  tsBetas[,i] <- fit_nelson_siegel(interp252, 0.24, tenors = c(1/12, 5, 10, 15, 20), start = i, T_ = 1)$betas
+}
+
+# will be used for noise matrix (observation covariance)
+sigOLS2 <- fit_nelson_siegel(interp252, 0.24, tenors = c(1/12, 5, 10, 15, 20), start = 1, T_ = 100)$sigma2
+
+ts.plot(tsBetas[2,])
+```
+
+```{r}
+yule_walker_ar1 <- function(ts) {
+  # Estimates the parameters of an AR(1) process using the Yule-Walker equations.
+  #
+  # Parameters:
+  # ts: A univariate time series (numeric vector).
+  #
+  # Returns:
+  # A list containing:
+  #   phi: The estimated autoregressive coefficient.
+  #   sigma2: The estimated variance of the innovations.
+  #   c: The estimated intercept term.
+
+  # Compute the sample mean (used for centering the time series)
+  mu <- mean(ts)
+  
+  # Center the time series
+  ts_centered <- ts - mu
+  
+  # Compute the autocovariance at lag 0 and lag 1
+  gamma0 <- var(ts_centered) * (length(ts_centered) - 1) / length(ts_centered)
+  gamma1 <- sum(ts_centered[-1] * ts_centered[-length(ts_centered)]) / length(ts_centered)
+  
+  # Estimate phi using the Yule-Walker equation
+  phi <- gamma1 / gamma0
+  
+  # Estimate the intercept c
+  c <- mu * (1 - phi)
+  
+  # Estimate the innovation variance sigma2
+  sigma2 <- gamma0 * (1 - phi^2)
+  
+  # Return the estimates
+  return(list(phi = phi, sigma2 = sigma2, c = c))
+}
+
+AR1_level <- yule_walker_ar1(tsBetas[1,])
+AR1_slope <- yule_walker_ar1(tsBetas[2,])
+AR1_curv <- yule_walker_ar1(tsBetas[3,])
+
+
+```
+
+```{r}
+simulate_var1 <- function(A, Q, c, h, initial) {
+  # Simulates a VAR(1) process for h steps.
+  #
+  # Parameters:
+  # A: 3x3 slope matrix
+  # Sigma: 3x3 covariance matrix of white noise
+  # c: 3x1 intercept vector
+  # h: number of steps to simulate
+  #
+  # Returns:
+  # A matrix of size 3xh containing the simulated VAR(1) process.
+  
+  library(MASS)
+  
+  # Initialize simulation matrix
+  d <- length(c)
+  Y <- matrix(0, nrow = d, ncol = h)
+  
+  # Initial state (assumed zero)
+  Y[,1] <- initial + mvrnorm(1, mu = rep(0, d), Sigma = Q)
+  
+  # Simulate VAR(1) process
+  for (t in 2:h) {
+    Y[,t] <- c + A %*% Y[,t-1] + mvrnorm(1, mu = rep(0, d), Sigma = Q)
+  }
+  
+  return(Y)
+}
+
+A <- diag(c(AR1_level$phi,
+            AR1_slope$phi,
+            AR1_curv$phi))
+
+Q <- diag(c(AR1_level$sigma2,
+            AR1_slope$sigma2,
+            AR1_curv$sigma2))
+
+c <- c(AR1_level$c,
+            AR1_slope$c,
+            AR1_curv$c)
+
+R <- sigOLS2 * diag(10)
+
+initial <- rowMeans(tsBetas)
+
+
+simulate_var1(A, Q, c, 100, initial)
+sqrt(sigOLS2)
+```
