@@ -1,0 +1,50 @@
+---
+title: "Data Cleaning"
+format: 
+  pdf:
+    geometry:
+      - top=30mm
+      - left=30mmx
+execute:      
+  echo: true
+---
+
+```{r}
+library(tidyverse)
+#install.packages("latex2exp")
+library(latex2exp )
+```
+
+
+This file is for data processing. 
+The Federal Reserve Bank of St. Louis provides comprehensive yield data on various U.S. Treasury securities, including bonds with different maturities, spanning from January 1962 to November 2024. The dataset contains yield-to-maturity values for bonds with maturities of 1 month, 3 months, 6 months, 1 year, 2 years, 3 years, 5 years, 7 years, 10 years, 20 years, and 30 years.
+
+```{r}
+clean_yield_raw <- read.csv('Clean_Yields.csv') 
+maturity_clean <- as.vector(c(1/12, 1/4, 1/2, 1, 2, 3, 5, 7, 10, 20, 30))
+clean_yield_raw <- na.omit(as.matrix(clean_yield_raw))
+st_louis_Fed_yields <- list()
+
+for(i in 1:nrow(clean_yield_raw)){
+  one_date_matrix <- tibble(
+    Maturity = maturity_clean,
+    ZERO_YLD1 = as.numeric(clean_yield_raw[i,2:12 ]),
+    START_DT = format(as.Date(clean_yield_raw[i,1], format="%Y-%m-%d"), "%Y%m%d")
+  )
+  one_date_matrix <- na.omit(one_date_matrix)
+
+  st_louis_Fed_yields[[i]] <- one_date_matrix
+}
+
+head(st_louis_Fed_yields)
+last960FredYields <- st_louis_Fed_yields[c((length(st_louis_Fed_yields) - 959):length(st_louis_Fed_yields))]
+last960FredYields[[960]]
+```
+
+Import the sample covariance matrix used for the Wishart generated spread covariance matrix.
+
+```{r}
+setwd('/Users/emmanuelcorona/PSTAT296-Project')
+First_Ten_CovMat <- as.matrix(read.csv('First_Ten_CovMat.csv'))[,-1]
+```
+
