@@ -112,14 +112,14 @@ bondItem <- setRefClass("bondItem",
   )
 )  
 
-bType <- bondType(
-  couponRate = 0.05,
-  issueDate = '2023-01-01',
-  maturityDate = '2033-01-01',
-  period = 1/2,
-  countingConvention = '30/360',
-  callable = T
-)
-
-stripBond1 <- bondStrip(1, bond1, '2023-02-01')
+# bType <- bondType(
+#   couponRate = 0.05,
+#   issueDate = '2023-01-01',
+#   maturityDate = '2033-01-01',
+#   period = 1/2,
+#   countingConvention = '30/360',
+#   callable = T
+# )
+# 
+# stripBond1 <- bondStrip(1, bond1, '2023-02-01')
 

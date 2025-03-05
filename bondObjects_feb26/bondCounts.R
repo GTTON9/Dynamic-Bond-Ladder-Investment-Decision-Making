@@ -45,25 +45,25 @@ bondCounts <- setRefClass("bondCounts",
 # Example Usage
 
 
-bond1 <- bondType(0.03, '2023-03-06', '2024-03-06', 1, '30/365', TRUE)
-bond2 <- bondType(0.04, '2023-01-01', '2033-01-01', 10, '30/360', FALSE)
-
-bi1 <- bondItem(bond1, TRUE)
-bi2 <- bondItem(bond2, TRUE)
-
-act1 <- bondBuy(5, bi1, '2025-01-01')
-act2 <- bondSell(3, bi2, '2025-01-01')
-act3 <- bondSell(2, bi1, '2025-01-03')
-act4 <- bondStrip(1, bi2, '2026-01-03')
-
-bc <- bondCounts()
-
-bc$bondAction(act1)
-bc$bondAction(act2)
-bc$bondAction(act3)
-bc$bondAction(act4)
-
-bc
+# bond1 <- bondType(0.03, '2023-03-06', '2024-03-06', 1, '30/365', TRUE)
+# bond2 <- bondType(0.04, '2023-01-01', '2033-01-01', 10, '30/360', FALSE)
+# 
+# bi1 <- bondItem(bond1, TRUE)
+# bi2 <- bondItem(bond2, TRUE)
+# 
+# act1 <- bondBuy(5, bi1, '2025-01-01')
+# act2 <- bondSell(3, bi2, '2025-01-01')
+# act3 <- bondSell(2, bi1, '2025-01-03')
+# act4 <- bondStrip(1, bi2, '2026-01-03')
+# 
+# bc <- bondCounts()
+# 
+# bc$bondAction(act1)
+# bc$bondAction(act2)
+# bc$bondAction(act3)
+# bc$bondAction(act4)
+# 
+# bc
 
 
 

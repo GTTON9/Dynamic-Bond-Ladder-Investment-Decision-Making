@@ -62,19 +62,19 @@ sellAction <- bondSell(units = 5,
                      bondObj = bond,
                      date = '2025-01-01'
 )
-# Accessing attributes using getter methods
-print(paste("Units Sold:", sellAction$getUnits()))                  # Output: 1000
-sellAction$getBondObj()# Output: "US Treasury"
-print(paste("Bond Sell Date:", sellAction$getBondDate()))         # Output: "2023-06-15"
-print(paste("Action Name:", sellAction$getName()))                    # Output: "buy"
-
-# Updating attributes using setter methods
-sellAction$setUnits(1500)
-sellAction$setBondDate("2023-07-01")
-sellAction$setName("sell action") # this shouldn't be applicable
-
-# Verifying the updated attributes
-print(paste("Updated Units Sold:", sellAction$getUnits()))          # Output: 1500
-print(paste("Updated Bond Sell Date:", sellAction$getBondDate())) # Output: "2023-07-01"
-print(paste("Updated Action Name:", sellAction$getName()))            # Output: "purchase"
+# # Accessing attributes using getter methods
+# print(paste("Units Sold:", sellAction$getUnits()))                  # Output: 1000
+# sellAction$getBondObj()# Output: "US Treasury"
+# print(paste("Bond Sell Date:", sellAction$getBondDate()))         # Output: "2023-06-15"
+# print(paste("Action Name:", sellAction$getName()))                    # Output: "buy"
+# 
+# # Updating attributes using setter methods
+# sellAction$setUnits(1500)
+# sellAction$setBondDate("2023-07-01")
+# sellAction$setName("sell action") # this shouldn't be applicable
+# 
+# # Verifying the updated attributes
+# print(paste("Updated Units Sold:", sellAction$getUnits()))          # Output: 1500
+# print(paste("Updated Bond Sell Date:", sellAction$getBondDate())) # Output: "2023-07-01"
+# print(paste("Updated Action Name:", sellAction$getName()))            # Output: "purchase"
 

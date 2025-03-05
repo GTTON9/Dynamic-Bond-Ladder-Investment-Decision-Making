@@ -30,10 +30,10 @@ timeToMaturity <- function(trading_day, maturity_day, convention) {
     
     # Convert days to years using 360-day year
     years_count <- days_count / 360
-    return(abs(years_count))
+    return(years_count)
   } else {
     # For all actual conventions, calculate actual days
-    days_count <- abs(as.numeric(difftime(maturity_day, trading_day, units = "days")))
+    days_count <- as.numeric(difftime(maturity_day, trading_day, units = "days"))
     
     if (convention == "actual/360") {
       years_count <- days_count / 360
@@ -67,7 +67,7 @@ timeToMaturity <- function(trading_day, maturity_day, convention) {
       }
     }
     
-    return(abs(years_count))
+    return(years_count)
   }
 }
 
