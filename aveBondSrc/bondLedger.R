@@ -9,7 +9,7 @@ bondLedger <- setRefClass("bondLedger",
   methods = list(
     initialize = function(currDate = NA_character_) {
       .self$tranTable <- data.frame(matrix(ncol = 4,nrow = 0))
-      colnames(.self$tranTable) <- c('transDate','numUnits','Action','bondID')
+      colnames(.self$tranTable) <- c('transDate','amt','action','bondID')
       
       .self$actTable <- data.frame(matrix(ncol = 3,nrow = 0))
       colnames(.self$actTable) <- c("bondID",'hasCoupons',"numUnits")
@@ -56,7 +56,9 @@ bondLedger <- setRefClass("bondLedger",
     
     
     appTranTable = function(newObs){
+      tempNames <- names(.self$tranTable)
       .self$tranTable <- rbind(.self$tranTable,newObs)
+      names(.self$tranTable) <- tempNames
     },
     
     rmTranObs = function(idList){
@@ -65,7 +67,9 @@ bondLedger <- setRefClass("bondLedger",
     },
     
     appActTable = function(newObs){
+      tempNames <- names(.self$actTable)
       .self$actTable <- rbind(.self$actTable,newObs)
+      names(.self$actTable) <- tempNames
     },
     
     rmActObs = function(idList){
@@ -78,9 +82,11 @@ bondLedger <- setRefClass("bondLedger",
               paste('b',as.character(length(.self$bondDict) + 1),sep = "")
               ,' <- ',"newBond", sep = "")))
     },
+    
     getDictVal = function(key){
       eval(parse(text=paste('return(',".self$bondDict$",key,')',sep = "")))
     }
+    
   )
 )
 

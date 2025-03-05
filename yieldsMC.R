@@ -1,4 +1,9 @@
-yieldMC <- function(valDate, tenors, yields) { 
+source("C:/Users/ander/Documents/PSTAT 296/PSTAT296-Project/NS_Funcs.R")
+library(MASS)
+library(expm)
+
+
+.yieldMC <- function(valDate, tenors, yields) { 
   # valDate: Date of valuation of the portfolio
   # tenors: tenors used for the simulation
   # yields: information on which the model is trained
@@ -260,9 +265,11 @@ yieldMC <- function(valDate, tenors, yields) {
   
   # parameters 
   A <- diag(3)
-  diag(A) <- c(yule_walker_ar1(tsBetas[1,])$phi,
-               yule_walker_ar1(tsBetas[2,])$phi,
-               yule_walker_ar1(tsBetas[3,])$phi)
+  # diag(A) <- c(yule_walker_ar1(tsBetas[1,])$phi,
+  #              yule_walker_ar1(tsBetas[2,])$phi,
+  #              yule_walker_ar1(tsBetas[3,])$phi)
+  
+  diag(A) <- c(0.95,0.9,0.8)
   
   Q <- diag(3)
   diag(Q) <- c(yule_walker_ar1(tsBetas[1,])$sigma2,
@@ -273,7 +280,7 @@ yieldMC <- function(valDate, tenors, yields) {
                                                   0.33, i, 
                                                   c(1, 5, 10, 15, 20), 1)$sigma2
   
-  C <- get_C(0.33, tenors)
+  C <- get_C(0.33, tenorNum)
   
   icpt <- (diag(3) - A) %*% rowMeans(tsBetas)
   
@@ -298,6 +305,7 @@ yieldMC <- function(valDate, tenors, yields) {
     x_real <- matrix(0, nrow = 3, ncol = T_)
     x_var_pred <- list()
     x_var_real <- list()
+    xStates <- matrix(0, nrow = 3, ncol = T_)
     
     
     lower_bound <- matrix(0, nrow = 10, ncol = T_)
@@ -329,6 +337,7 @@ yieldMC <- function(valDate, tenors, yields) {
       E_y_vec[, i] <- as.vector(E_y_t)
       y_real[, i] <- as.vector(y_t[[i]])
       E_x_vec[, i] <- as.vector(E_x_t)
+      xStates[, i] <- as.vector(next_x)
       std_dev <- sqrt(diag(F_t))  
       lower_bound[, i] <- E_y_vec[, i] - 1.96 * std_dev
       upper_bound[, i] <- E_y_vec[, i] + 1.96 * std_dev
@@ -343,44 +352,73 @@ yieldMC <- function(valDate, tenors, yields) {
     }
     
 
-    return(list(E_y_vec = E_y_vec, y_real = y_real, E_x_vec = E_x_vec, x_var_pred = x_var_pred, x_var_real = x_var_real))
+    return(list(xStates = xStates , x_var_real = x_var_real,obsCov = D %*% R %*% t(D),
+                baseCov = B %*% Q %*% t(B)))
   } 
   
   
   kfRun <- KF_loop(A, diag(3), C, diag(ncol(yields)), R, Q, icpt, yieldList, numObsInterp, tsBetas)
 
-  states <- kfRun$E_x_vec
-  covs <- kfRun$x_var_pred
+  states <- kfRun$xStates
+  covs <- kfRun$x_var_real
+
+  obsCov <- kfRun$obsCov
+  baseCov <- kfRun$baseCov
 
   lastIdx <- ncol(states)
   
   lastState <- states[,lastIdx]
   lastCov <- covs[[lastIdx]]
-  lastDate <- dates[lastIds]
-  return()
+  lastDate <- dates[lastIdx]
+  
+  outPut <- list(A,lastState,lastCov,obsCov,baseCov,lastDate)
+  
+  hStep <- as.numeric(as.Date(valDate) - as.Date(outPut[[6]]))
+  
+  C <- NS(tenors,0.33)
+  A <- outPut[[1]]
+  
+  foreEX <- C %*% (A %^% hStep) %*% outPut[[2]]
+  
+  foreVAR <-  (A %^% hStep) %*% outPut[[3]] %*% t(A %^% hStep) + outPut[[5]]
+  for(i in 1:(hStep - 1)){
+    foreVAR <- foreVAR + (A %^% i) %*% outPut[[5]] %*% t((A %^% i))
+  }
+  
+  foreVAR <- C %*% foreVAR %*% t(C)
+  
+  simMat <- matrix(nrow = 1000,ncol = nrow(foreVAR))
+  
+  for(i in 1:nrow(simMat)){
+    simMat[i,] <- as.vector(foreEX + mvrnorm(mu = rep(0,nrow(foreVAR)), Sigma = foreVAR))
+  }
+  
+  return(simMat)
 }
 
 
-yieldMat <- matrix(0, nrow = 50, ncol = 10)
-yieldMock <- c(1.5, 2.1, 2.4, 
-               2.6, 3, 3.1, 
-               3.15, 3.2, 3.23, 3.23)
-for(i in 1:50) {
-  yieldMat[i,] <- yieldMock + mvrnorm(mu = rep(0, 10), Sigma = 0.01 * diag(10))
-}
+# yieldMat <- matrix(0, nrow = 50, ncol = 10)
+# yieldMock <- c(1.5, 2.1, 2.4, 
+#                2.6, 3, 3.1, 
+#                3.15, 3.2, 3.23, 3.23)
+# for(i in 1:50) {
+#   yieldMat[i,] <- yieldMock + mvrnorm(mu = rep(0, 10), Sigma = 0.01 * diag(10))
+# }
+# 
+# chartenors <- c('1M', '3M', '6M', '1Y',
+#            '2Y', '3Y', '5Y', '7Y', 
+#            '10Y', '20Y')
+# colnames(yieldMat) <- chartenors
+# 
+# dates <- seq(as.Date("1900-01-01"), by = "day", length.out= 50)
+# 
+# 
+# rownames(yieldMat) <- as.character(dates)
 
-chartenors <- c('1M', '3M', '6M', '1Y',
-           '2Y', '3Y', '5Y', '7Y', 
-           '10Y', '20Y')
-colnames(yieldMat) <- chartenors
 
-dates <- seq(as.Date("1900-01-01"), by = "day", length.out= 50)
+#
+#
 
 
-rownames(yieldMat) <- as.character(dates)
 
-yieldMC('01-01-2000', tenors, yieldMat)
 
-yieldMat[1,]['1M']
-
-# ADD NEXT STEP ITERATION

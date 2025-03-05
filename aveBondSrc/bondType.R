@@ -15,7 +15,8 @@ bondType <- setRefClass("bondType",
     initialize = function(couponRate = NA_real_, issueDate = NA_character_, 
                           maturityDate = NA_character_, period = NA_real_, 
                           countingConvention = NA_character_, 
-                          bondID = NA_real_,bondSchedule = NULL,callable = FALSE) {
+                          bondID = NA_real_,bondSchedule = NULL,callable = FALSE
+                          ) {
       .self$couponRate <- couponRate
       .self$issueDate <- issueDate
       .self$maturityDate <- maturityDate
@@ -95,14 +96,14 @@ bondType <- setRefClass("bondType",
 # Define the bondType class (same as above)
 
 # # Create a new bondType object
-bond <- bondType(couponRate = 0.05,
-                     issueDate = "2023-01-01",
-                     maturityDate = "2033-01-01",
-                     period = 6,
-                     countingConvention = "30/360",
-                     bondID = 0,
-                     bondSchedule = list(''),
-                     callable = TRUE)
+# bond <- bondType(couponRate = 0.05,
+#                      issueDate = "2023-01-01",
+#                      maturityDate = "2033-01-01",
+#                      period = 6,
+#                      countingConvention = "30/360",
+#                      bondID = 0,
+#                      bondSchedule = list(''),
+#                      callable = TRUE)
 
 # # Accessing attributes using getter methods
 # print(paste("Coupon Rate:", bond$getCouponRate()))            # Output: 0.05
