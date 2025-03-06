@@ -6,17 +6,20 @@ bondPortfolio <- setRefClass("bondPortfolio",
     bondLedger = 'ANY',
     cashPosition = "ANY",
     currDate = 'character',
-    posList = "list"
+    posList = "list",
+    yieldObj = "ANY"
   ),
   
   methods = list(
-    initialize = function(bondLedger = NULL,cashPosition = NULL,currDate = NA_character_) {
+    initialize = function(bondLedger = NULL,cashPosition = NULL,currDate = NA_character_, 
+                          yieldObj = NULL) {
       
       .self$posList <- list()
       .self$posList[[1]] <- bondLedger
       .self$posList[[2]] <- cashPosition
       
       .self$currDate <- currDate
+      .self$yieldObj <- yieldObj
       
       # Use `bondDict <- setNames(bondDict,nameVec)` for setting indexing. 
     },
@@ -49,6 +52,14 @@ bondPortfolio <- setRefClass("bondPortfolio",
     
     getCashPos = function(){
       return(.self$getCashPosOb()$getPos())
+    },
+    
+    getYieldObj = function(){
+      return(.self$yieldObj)
+    },
+    
+    setYieldObj = function(newYieldObj){
+      .self$yieldObj = newYieldObj
     },
     
     

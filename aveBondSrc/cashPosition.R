@@ -105,8 +105,7 @@ cashPosition <- setRefClass("cashPosition",
       }
     },
     
-    
-    updateCashPos(action,amt,moveForward = T){
+    updateCashPos = function(action,amt,moveForward = T){
       
       currDeficit <- .self$getDeficit()
       currSurplus <- .self$getSurplus()
