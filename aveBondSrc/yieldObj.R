@@ -1,4 +1,5 @@
 source("yieldsMC.R")
+source("aveBondSrc/bootstrapFuncs.R")
 
 yieldObj <- setRefClass("yieldObj",
   fields = list(
@@ -7,7 +8,7 @@ yieldObj <- setRefClass("yieldObj",
   ),
   
   methods = list(
-    initialize = function(realYields = NULL, outKF = NULL
+    initialize = function(realYields = NULL, outKF = list()
     ) {
       .self$realYields <- realYields
       .self$outKF <- outKF
@@ -41,7 +42,8 @@ yieldObj <- setRefClass("yieldObj",
       outPut <- .self$getOutKF()
       hStep <- as.numeric(as.Date(valDate) - as.Date(outPut[[6]]))
       
-      C <- NS(tenors,0.33)
+      someTens <- outPut[[8]]
+      C <- outPut[[7]]
       A <- outPut[[1]]
       
       foreEX <- C %*% (A %^% hStep) %*% outPut[[2]]
@@ -51,12 +53,13 @@ yieldObj <- setRefClass("yieldObj",
         foreVAR <- foreVAR + (A %^% i) %*% outPut[[5]] %*% t((A %^% i))
       }
       
-      foreVAR <- C %*% foreVAR %*% t(C)
+      foreVAR <- C %*% foreVAR %*% t(C) + outPut[[4]]
       
-      simMat <- matrix(nrow = simCount,ncol = nrow(foreVAR))
+      simMat <- matrix(nrow = simCount,ncol = length(tenors))
       
       for(i in 1:nrow(simMat)){
-        simMat[i,] <- as.vector(foreEX + mvrnorm(mu = rep(0,nrow(foreVAR)), Sigma = foreVAR))
+        tempVar <- as.vector(foreEX + mvrnorm(mu = rep(0,nrow(foreVAR)), Sigma = foreVAR))
+        simMat[i,] <- interp_yc(someTens,tempVar,tenors)$ZERO_YLD1
       }
       
       return(simMat)
@@ -66,6 +69,13 @@ yieldObj <- setRefClass("yieldObj",
       tempNames <- names(.self$realYields)
       .self$realYields <- rbind(.self$realYields, newObs)
       names(.self$realYields) <- tempNames
+    },
+    
+    somePV = function(something){
+      NULL
     }
+    
+    
+    
   )
 )

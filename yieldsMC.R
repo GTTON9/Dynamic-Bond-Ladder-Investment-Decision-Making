@@ -1,6 +1,7 @@
 source("C:/Users/ander/Documents/PSTAT 296/PSTAT296-Project/NS_Funcs.R")
 library(MASS)
 library(expm)
+library(MTS)
 
 
 .yieldMC <- function(yields) { 
@@ -265,12 +266,16 @@ library(expm)
   
   # parameters 
   A <- diag(3)
-  # diag(A) <- c(yule_walker_ar1(tsBetas[1,])$phi,
-  #              yule_walker_ar1(tsBetas[2,])$phi,
-  #              yule_walker_ar1(tsBetas[3,])$phi)
+  diag(A) <- c(yule_walker_ar1(tsBetas[1,])$phi,
+               yule_walker_ar1(tsBetas[2,])$phi,
+               yule_walker_ar1(tsBetas[3,])$phi)
   
-  diag(A) <- c(0.95,0.9,0.8)
+  # myVarma <- VARMA(t(tsBetas), p = 1)
+  # A <- myVarma$Phi
+  # Q <- myVarma$Sigma
   
+  # diag(A) <- c(0.95,0.9,0.8)
+
   Q <- diag(3)
   diag(Q) <- c(yule_walker_ar1(tsBetas[1,])$sigma2,
                yule_walker_ar1(tsBetas[2,])$sigma2,
@@ -371,7 +376,7 @@ library(expm)
   lastCov <- covs[[lastIdx]]
   lastDate <- dates[lastIdx]
   
-  outPut <- list(A,lastState,lastCov,obsCov,baseCov,lastDate)
+  outPut <- list(A,lastState,lastCov,obsCov,baseCov,lastDate,C,tenorNum)
   
   return(outPut)
 }
