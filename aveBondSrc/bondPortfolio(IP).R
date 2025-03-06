@@ -262,6 +262,9 @@ bondPortfolio <- setRefClass("bondPortfolio",
           }
           
         }
+        else if(action == 'none'){
+          currCashPos$updateCashPos('none',0,noAdj)
+        }
         
       }
       
