@@ -164,55 +164,54 @@ library(MTS)
     return(interpolated_yc)
   }
   
-  totNumObs <- length(yieldList)
-  numObsInterp <- ifelse(totNumObs > 200, 200, totNumObs)
-  
+  numObs <- length(yieldList)
+
   # cubic spline interp.
-  yieldsInterp <- interpolate_list(yieldList, totNumObs - numObsInterp + 1, numObsInterp)
+  yieldsInterp <- interpolate_list(yieldList, 1, numObs)
   
   # fit static nelson siegel function
   fit_nelson_siegel <- function(yield_list, lambda, start, tenors, T_){
-  # yield_list: Parameter of the form of a list of data frames containing ZCB spot rate
-  # lambda: Individual lambda parameter for NS
-  # start: starting date from the yield_list list
-  # tenors: list of time to maturities
-  # T_: length of time window
-
-  indices <- which(round(yield_list[[start]]$Maturity, 2) %in% round(tenors, 2))
-  maturities <- yield_list[[1]]$Maturity[indices]
-  N <- length(maturities)
+    # yield_list: Parameter of the form of a list of data frames containing ZCB spot rate
+    # lambda: Individual lambda parameter for NS
+    # start: starting date from the yield_list list
+    # tenors: list of time to maturities
+    # T_: length of time window
   
-  term1 <- 1
-  term2 <- (1 - exp(-maturities*lambda)) / (maturities*lambda)
-  term3 <- ((1 - exp(-maturities*lambda)) / (maturities*lambda)) - exp(-maturities*lambda)
-  Phi <- cbind(term1, term2, term3) # Construct Phi matrix for NS
-  
-  Y_mat <- matrix(0, nrow = N, # matrix of N by T, containing yields for each tenor (columns)
-                  ncol = T_) # where each column represents a different date
-  j <- 1
-  for(t in start:(start + T_- 1)){
-    Y_mat[,j] <- yield_list[[t]]$ZERO_YLD1[indices]
-    phitphi_1phit <- solve(t(Phi) %*% Phi, t(Phi)) # OLS for the coefficients for every single day
-    betas_t <- phitphi_1phit %*% Y_mat  
-    betas <- rowSums(betas_t) / T_ # average all coefficients
-    eps <- matrix(0, nrow = N, ncol = T_) # matrix of errors for each day (column) and each tenor (row)
-    for(t in 1:T_){
-      eps[,t] <- Y_mat[,t] - Phi %*% betas # Populate errors
+    indices <- which(round(yield_list[[start]]$Maturity, 2) %in% round(tenors, 2))
+    maturities <- yield_list[[1]]$Maturity[indices]
+    N <- length(maturities)
+    
+    term1 <- 1
+    term2 <- (1 - exp(-maturities*lambda)) / (maturities*lambda)
+    term3 <- ((1 - exp(-maturities*lambda)) / (maturities*lambda)) - exp(-maturities*lambda)
+    Phi <- cbind(term1, term2, term3) # Construct Phi matrix for NS
+    
+    Y_mat <- matrix(0, nrow = N, # matrix of N by T, containing yields for each tenor (columns)
+                    ncol = T_) # where each column represents a different date
+    j <- 1
+    for(t in start:(start + T_- 1)){
+      Y_mat[,j] <- yield_list[[t]]$ZERO_YLD1[indices]
+      phitphi_1phit <- solve(t(Phi) %*% Phi, t(Phi)) # OLS for the coefficients for every single day
+      betas_t <- phitphi_1phit %*% Y_mat  
+      betas <- rowSums(betas_t) / T_ # average all coefficients
+      eps <- matrix(0, nrow = N, ncol = T_) # matrix of errors for each day (column) and each tenor (row)
+      for(t in 1:T_){
+        eps[,t] <- Y_mat[,t] - Phi %*% betas # Populate errors
+      }
+      sig_hat2 <- sum(as.vector(eps)^2) / (N * T_ - 3) # take mean squared error (MLE Estimator)
     }
-    sig_hat2 <- sum(as.vector(eps)^2) / (N * T_ - 3) # take mean squared error (MLE Estimator)
-  }
-
-  return(list(betas = betas, # fitted betas static: 1*3   dynamic: T*3
-              sigma2 = sig_hat2, # MSE
-              lambda = lambda, # lambda(input)
-              cov_mat_betas = sig_hat2 * solve(t(Phi) %*% Phi), # Nelson Siegel design matrix N*3
-              eps = eps,
-              Phi = Phi)) # residuals N*T
+  
+    return(list(betas = betas, # fitted betas static: 1*3   dynamic: T*3
+                sigma2 = sig_hat2, # MSE
+                lambda = lambda, # lambda(input)
+                cov_mat_betas = sig_hat2 * solve(t(Phi) %*% Phi), # Nelson Siegel design matrix N*3
+                eps = eps,
+                Phi = Phi)) # residuals N*T
   }
   
   # create time series of betas
-  tsBetas <- matrix(NA, nrow = 3, ncol = numObsInterp)
-  for (i in 1:numObsInterp) {
+  tsBetas <- matrix(NA, nrow = 3, ncol = numObs)
+  for (i in 1:numObs) {
     tsBetas[,i] <- fit_nelson_siegel(yieldsInterp,
                                      0.33, i, c(1, 5, 10, 15, 20), 1)$betas
   }
@@ -277,6 +276,7 @@ library(MTS)
   # diag(A) <- c(0.95,0.9,0.8)
 
   Q <- diag(3)
+  
   diag(Q) <- c(yule_walker_ar1(tsBetas[1,])$sigma2,
                yule_walker_ar1(tsBetas[2,])$sigma2,
                 yule_walker_ar1(tsBetas[3,])$sigma2)
@@ -362,7 +362,7 @@ library(MTS)
   } 
   
   
-  kfRun <- KF_loop(A, diag(3), C, diag(ncol(yields)), R, Q, icpt, yieldList, numObsInterp, tsBetas)
+  kfRun <- KF_loop(A, diag(3), C, diag(ncol(yields)), R, Q, icpt, yieldList, numObs, tsBetas)
 
   states <- kfRun$xStates
   covs <- kfRun$x_var_real
