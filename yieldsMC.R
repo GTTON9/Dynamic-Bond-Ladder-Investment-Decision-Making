@@ -1,7 +1,7 @@
 source("C:/Users/ander/Documents/PSTAT 296/PSTAT296-Project/NS_Funcs.R")
 library(MASS)
 library(expm)
-library(MTS)
+# library(MTS)
 
 
 .yieldMC <- function(yields) { 
@@ -382,7 +382,7 @@ library(MTS)
   lastCov <- covs[[lastIdx]]
   lastDate <- dates[lastIdx]
   
-  outPut <- list(A,lastState,lastCov,obsCov,baseCov,lastDate,C,tenorNum)
+  outPut <- list(A,lastState,lastCov,obsCov,baseCov,lastDate,C,tenorNum,icpt)
   
   return(outPut)
 }
@@ -406,8 +406,6 @@ library(MTS)
 # rownames(yieldMat) <- as.character(dates)
 # 
 # 
-.yieldMC(yieldMat[,c(1:9)])
-
 
 
 

@@ -46,7 +46,7 @@ yieldObj <- setRefClass("yieldObj",
       C <- outPut[[7]]
       A <- outPut[[1]]
       
-      foreEX <- C %*% (A %^% hStep) %*% outPut[[2]]
+      foreEX <- C %*% (A %^% hStep + outPut[[9]]) %*% outPut[[2]]
       
       foreVAR <-  (A %^% hStep) %*% outPut[[3]] %*% t(A %^% hStep) + outPut[[5]]
       for(i in 1:(hStep - 1)){
