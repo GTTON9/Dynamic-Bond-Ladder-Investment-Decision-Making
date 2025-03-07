@@ -155,7 +155,10 @@ library(plyr)
     return(list(phi = phi, sigma2 = sigma2, c = c))
   }
   
-  tsBetas <- betas
+  
+  funkyOut <- fit_nelson_siegel(yieldMat, 0.33, tenorNum, myTens)
+  
+  tsBetas <- funkyOut$betas
   
   # parameters 
   A <- diag(3)
@@ -179,7 +182,6 @@ library(plyr)
   #                                                 0.33, 1, 
   #                                                 nsTenors, 1)$sigma2
   
-  funkyOut <- fit_nelson_siegel(yieldMat, 0.33, tenorNum, myTens)
   R <- funkyOut$sigma2
   yieldMat <- funkyOut$yieldMat
   C <- NS(myTens,lambda)
