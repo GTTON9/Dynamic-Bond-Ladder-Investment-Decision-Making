@@ -81,7 +81,7 @@ bondPortfolio <- setRefClass("bondPortfolio",
       }
       
       yieldPV <- function(valDate,tenors){
-        return(  self$yieldObj$yieldInS(valDate,tenors))
+        return(  .self$yieldObj$yieldInS(valDate,tenors))
       }
       
       if (as.Date(valDate) < as.Date(bondType$issueDate)) {
@@ -90,6 +90,7 @@ bondPortfolio <- setRefClass("bondPortfolio",
 
       
       if(hasCoupon){
+        period <- bondType$getPeriod()
         
         # Find the time to maturity of the bond
         ttm <- timeToMaturity(as.Date(valDate),
@@ -112,9 +113,12 @@ bondPortfolio <- setRefClass("bondPortfolio",
         # number of cash flows left:
         
         if(as.Date(valDate) > as.Date(.self$yieldObj$getOutKF()[[6]])){
-          yields <- yieldMC(valDate,c(ttmCoupons[ttmCoupons > 0],ttm)) / 100 # yields to maturity
           
-          pvCoupons <- (bondType$couponRate / period) * (1 + yields[,1:(ncol(yields)-1)]) ** 
+          
+          yields <- yieldMC(valDate,c(ttmCoupons[ttmCoupons > 0],ttm)) / 100 # yields to maturity
+          bern <- ifelse(ncol(yields) == sum(ttmCoupons > 0),0,1)
+
+          pvCoupons <- (bondType$couponRate / period) * (1 + yields[,1:(ncol(yields)-bern)]) ** 
             (-ttmCoupons[ttmCoupons > 0])
           pvCoupons <- as.vector(rowSums(pvCoupons))
           
@@ -123,35 +127,52 @@ bondPortfolio <- setRefClass("bondPortfolio",
         else{
           yields <- yieldPV(valDate,c(ttmCoupons[ttmCoupons > 0],ttm)) / 100
           
-          pvCoupons <- (bondType$couponRate / period) * (1 + yields[-length(yields)]) ** 
+          pvCoupons <- (bondType$getCouponRate() / period) * (1 + yields[-length(yields)]) ** 
             (-ttmCoupons[ttmCoupons > 0])
-          pvCoupons <- sum(rowSums(pvCoupons))
+          pvCoupons <- as.numeric(sum(pvCoupons))
           
-          pvFace <- 1/(1+yields[length(yields)]) ** ttm
+          pvFace <- as.numeric(1/(1+yields[length(yields)]) ** ttm)
         }
 
       }
         
       else{
+
+        if(as.Date(valDate) > as.Date(.self$yieldObj$getOutKF()[[6]])){
+
+          ttm <- timeToMaturity(as.Date(valDate),
+                                as.Date(bondType$maturityDate),
+                                bondType$countingConvention)
+          yields <- yieldMC(valDate,ttm) / 100
+          pvFace <- as.vector(1/(1+yields) ** ttm)
+          pvCoupons <- 0
+        }
+        else{
+          ttm <- timeToMaturity(as.Date(valDate),
+                                as.Date(bondType$maturityDate),
+                                bondType$countingConvention)
+          yields <- yieldPV(valDate,ttm) / 100
+          pvFace <- as.vector(1/(1+yields) ** ttm)
+          pvCoupons <- 0
+        }
         # Find the time to maturity of the bond
-        ttm <- timeToMaturity(as.Date(valDate),
-                              as.Date(bondType$maturityDate),
-                              bondType$countingConvention)
-        yields <- yieldMC(valDate,ttm) / 100
-        pvFace <- as.vector(1/(1+yields) ** ttm)
-        pvCoupons <- 0
+
       }
       
       thePV <- pvCoupons + pvFace
       return(numUnits * thePV)
     },
     
-    getAssetPV = function(valDate, yieldMC, actTable, bondDict){
+    getAssetPV = function(valDate, bondDict){
+      
+      valDate <- .self$getCurrDate()
+      bondDict <- .self$getBondLedgerOb()$getBondDict()
+      actTable <- .self$getBondLedgerOb()$getActTable()
       
       assetPV <- 0
       for(i in 1:nrow(actTable)){
         currOb <- actTable[i,]
-        currPV <- .self$.getAssetPV(valDate = valDate, bondType = bondDict[[currOb[1]]], 
+        currPV <- .self$.getAssetPV(valDate = valDate, bondType = bondDict[[currOb[[1]]]], 
                numUnits = currOb[[3]], hasCoupon = currOb[[2]])
         assetPV <- assetPV + currPV
       }
@@ -166,19 +187,20 @@ bondPortfolio <- setRefClass("bondPortfolio",
       currBondDict <- .self$getBondLedgerOb()$bondDict
       currCashPos <- .self$getCashPosOb()
       
-      noAdj <- TRUE
+      noAdj <- FALSE
       idList <- currActTable$bondID
       
       # Bring in predetermined cashflows and initialize.
       
       if(moveForward & notChecked & !is.logical(idList)){
+        noAdj = TRUE
         newDate <- as.character(as.Date(.self$currDate) + 1)
 
         
         for(a in idList){
           currBondType <- currBondDict[[a]]
-          currSched <- if(currBondType$bondSchedule != '') as.Date(currBondType$bondSchedule) else
-            ''
+          currSched <- if(length(currBondType$bondSchedule) != 0) as.Date(currBondType$bondSchedule) else
+            list()
           
           if(newDate %in% currSched){
             cpn_rate <- currBondType$getCouponRate() / currBondType$getPeriod()
@@ -227,9 +249,9 @@ bondPortfolio <- setRefClass("bondPortfolio",
           if(is.na(numUnits)){
             
             currBond <- currActTable[which(currActTable$bondID == bondID),]
-            currPV <- .getAssetPV(newDate,currBondType, currBond[3], currBond[2])
+            currPV <- .getAssetPV(newDate,currBondType, as.numeric(currBond[3]), as.logical(currBond[2]))
             currCashPos$updateCashPos('cashUp',currPV,noAdj)
-            
+
             transOb <- data.frame(transDate = as.character(newDate), amt = currPV, 
                                   action = 'Sell All', bondID = bondID)
             
@@ -290,9 +312,11 @@ bondPortfolio <- setRefClass("bondPortfolio",
             }
             
 
-            currPV <- .getAssetPV(newDate, currBondType, currBond[3], currBond[2])
+            currPV <- .getAssetPV(newDate, currBondType, as.numeric(currBond[3]), 
+                                  as.logical(currBond[2]))
             currBond[2] <- FALSE
-            currFV <- .getAssetPV(newDate, currBondType, currBond[3], currBond[2])
+            currFV <- .getAssetPV(newDate, currBondType, as.numeric(currBond[3]), 
+                                  as.logical(currBond[2]))
             theDiff <- currPV - currFV
             
             currCashPos$updateCashPos('cashUp',theDiff,noAdj)
@@ -310,10 +334,10 @@ bondPortfolio <- setRefClass("bondPortfolio",
           }
           
         }
-        else if(action == 'none'){
-          currCashPos$updateCashPos('none',0,noAdj)
-        }
         
+      }
+      else{
+        currCashPos$updateCashPos('none',0,noAdj)
       }
       
       # Wrap up adjustments.
@@ -328,6 +352,10 @@ bondPortfolio <- setRefClass("bondPortfolio",
       .self$setCurrDate(as.character(newDate))
       .self$setCashPosOb(currCashPos)
       
+    },
+    
+    getPortVal = function(){
+      return( .self$getCashPos() + .self$getAssetPV() )
     }
   )
 )
