@@ -49,58 +49,51 @@ cashPosition <- setRefClass("cashPosition",
     },
     
     getPos = function(){
-      return(.self$surplus + .self$deficit)
+      return(.self$surplus - .self$deficit)
     },
     
     
     h1 = function(action,amt,moveForward = T){
-      if(action == 'cashDown'){
-        return(-amt)
-      }
       
-      else if(action == 'cashUp'){
+      if(action == 'cashUp'){
+        return(-amt)
+      }else if(action == 'cashDown'){
         
         if(moveForward){
           newS <- .self$getSurplus() * exp(.self$getFixedRate())
-        }
-        else{
+          
+        }else{
           newS <- .self$getSurplus()
         }
         
         return(-min(0,newS + h2(action,amt,moveForward = moveForward)))
-      }
-      
-      else if(action == 'none'){
+        
+      }else if(action == 'none'){
         return(0)
-      }
-      
-      else {
+        
+      }else {
         stop("Invalid action specified.")
       }
     },
     
     h2 = function(action,amt,moveForward = T){
-      if(action == 'cashUp'){
-        return(-amt)
-      }
       
-      else if(action == 'cashDown'){
+      if(action == 'cashDown'){
+        return(-amt)
+      }else if(action == 'cashUp'){
         
         if(moveForward){
           newS <- .self$getDeficit() * exp(.self$getFixedRate())
-        }
-        else{
+        }else{
           newS <- .self$getDeficit()
         }
+
+        return(-min(c(0,newS + h1(action,amt,moveForward = moveForward))))
         
-        return(-min(0,newS + h1(action,amt,moveForward = moveForward)))
-      }
-      
-      else if(action == 'none'){
+      }else if(action == 'none'){
         return(0)
-      }
-      
-      else {
+        
+      }else {
         stop("Invalid action specified.")
       }
     },

@@ -1,4 +1,4 @@
-interp_yc <- function(ttms, yieldVec,newTen, degree = 3){
+interp_yc <- function(ttms, yieldMat,newTen, degree = 3){
   
   # yield_list: parameter of the form of a list of data frames containing ZCB spot rate
   # int knots: the interior knots used for b-spline construction
@@ -68,23 +68,25 @@ interp_yc <- function(ttms, yieldVec,newTen, degree = 3){
   }
   
 
-  yc_df_pre <- rbind(data.frame(Maturity = 0, ZERO_YLD1 = 0), data.frame(Maturity = ttms,
-                                                                         ZERO_YLD1 = yieldVec))
-  yc_df <- yc_df_pre
-  yields <- c(0, yc_df$ZERO_YLD1)
-  maturities <- c(0, as.numeric(yc_df$Maturity))
-  x <- as.numeric(maturities) # maturity dates
-  B <- matrix_b(x, degree=degree, int_knots = int_knots) 
+  if((1 %in% dim(yieldMat)) | is.vector(yieldMat)){
+    yields <- t(c(0,yieldMat))
+  }else{
+    yields <- cbind(rep(0, nrow(yieldMat)),yieldMat)
+  }
+  
+  x <- as.numeric(c(0,ttms)) # maturity dates
+  B <- matrix_b(x, degree=degree, int_knots = ,int_knots)
   B_t_B <- t(B) %*% B
+  
   # B is the design matrix on which the least squares coefficients will be calculated
   
-  alphas <- solve(B_t_B) %*% t(B) %*% yields # OLS Formula for coefficients
+  alphas <- solve(B_t_B) %*% t(B) %*% t(yields) # OLS Formula for coefficients
   x2 <- newTen # this range is used to simulate a continuous yield curve
   B2 <- matrix_b(x2, degree = degree, int_knots = int_knots) 
   # B2 is the matrix of basis functions but evaluated at a 'continuous' time (not really but close enough)
   
-  interpolated_yields <- data.frame(Maturity = x2, ZERO_YLD1 = B2 %*% alphas) # create dataframes for plotting
-  og_yields <- data.frame(ttm = maturities, yield = yields)
+  interpolated_yields <- t(B2 %*% alphas) # create dataframes for plotting
+
   
   return(interpolated_yields)
 }

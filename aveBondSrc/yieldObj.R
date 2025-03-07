@@ -1,4 +1,5 @@
-source("yieldsMC.R")
+# source("yieldsMC.R")
+source("aveBondSrc/phoronYield.R")
 source("aveBondSrc/bootstrapFuncs.R")
 
 dupInd <- function(someVec){
@@ -75,7 +76,7 @@ yieldObj <- setRefClass("yieldObj",
       .self$setOutKF(outPut)
     },
     
-    simTen = function(valDate,tenors,simCount = 1000){
+    simTen = function(valDate,tenors,simCount = 500){
       
       outPut <- .self$getOutKF()
       hStep <- as.numeric(as.Date(valDate) - as.Date(outPut[[6]]))
@@ -100,19 +101,20 @@ yieldObj <- setRefClass("yieldObj",
       
       simMat <- matrix(nrow = simCount,ncol = length(tenors))
       
-      for(i in 1:nrow(simMat)){
-        tempVar <- as.vector(foreEX + mvrnorm(mu = rep(0,nrow(foreVAR)), Sigma = foreVAR))
-        tempVec <- interp_yc(someTens,tempVar,unique(sort(tenors)))$ZERO_YLD1
-        
-        simMat[i,] <- tempVec[dupInds]
-      }
+
+      tempVar <-mvrnorm(n = simCount,mu = foreEX,Sigma = foreVAR)
+      
+      simMat <- interp_yc(someTens,tempVar,unique(sort(tenors)))
+      
       
       return(simMat)
     },
     
     appRealYields = function(newObs){
       tempNames <- names(.self$realYields)
-      .self$realYields <- rbind(.self$realYields, newObs)
+      tempObs <- newObs
+      names(tempObs) <- tempNames
+      .self$realYields <- rbind(.self$realYields, tempObs)
       names(.self$realYields) <- tempNames
     },
     
@@ -124,14 +126,13 @@ yieldObj <- setRefClass("yieldObj",
       if(as.Date(lastDate) < valDate){
         stop("Attempting to find yields beyond bond sample information. Use simTen instead.")
       }
-      currBondYields <- .self$realYields[valDate,]
+      
+      currBondYields <- .self$realYields[as.character(valDate),]
       currTTM <- .self$getYieldTenors()
       dupInds <- dupInd(tenors)
       
-      return(interp_yc(currTTM,currBondYields,unique(sort(tenors)))$ZERO_YLD1[dupInds])
+      return(interp_yc(currTTM,currBondYields,unique(sort(tenors)))[dupInds])
       
     }
-    
-    
   )
 )
