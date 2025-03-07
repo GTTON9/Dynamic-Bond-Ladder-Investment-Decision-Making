@@ -80,7 +80,7 @@ cashPosition <- setRefClass("cashPosition",
     },
     
     h2 = function(action,amt,moveForward = T){
-      if(action == 'CashUp'){
+      if(action == 'cashUp'){
         return(-amt)
       }
       
@@ -93,7 +93,7 @@ cashPosition <- setRefClass("cashPosition",
           newS <- .self$getDeficit()
         }
         
-        return(-min(0,newS + h2(action,amt,moveForward = moveForward)))
+        return(-min(0,newS + h1(action,amt,moveForward = moveForward)))
       }
       
       else if(action == 'none'){

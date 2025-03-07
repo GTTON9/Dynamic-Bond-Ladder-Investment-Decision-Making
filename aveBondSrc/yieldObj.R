@@ -1,17 +1,44 @@
 source("yieldsMC.R")
 source("aveBondSrc/bootstrapFuncs.R")
 
+dupInd <- function(someVec){
+  
+  if(!(TRUE %in% duplicated(someVec))){
+    ordVec <- someVec[order(someVec)]
+    return(match(someVec,ordVec))
+  }
+  
+  ordInd <- order(someVec)
+  ordVec <- someVec[ordInd]
+  
+  lwr <- anyDuplicated(ordVec,fromLast = T)
+  upr <- anyDuplicated(ordVec,fromLast = F)
+  dupVal <- ordVec[upr]
+  
+  
+  
+  
+  ordInd[which(ordInd == lwr)] <- upr
+  
+  ordInd[ordVec >= dupVal] <- ordInd[ordVec >= dupVal] - 1
+  
+  return(ordInd)
+}
+
+
 yieldObj <- setRefClass("yieldObj",
   fields = list(
     realYields = "matrix",
+    yieldTenors = "numeric",
     outKF = "list"
   ),
   
   methods = list(
-    initialize = function(realYields = NULL, outKF = list()
+    initialize = function(realYields = NULL, outKF = list(), yieldTenors = NA_real_
     ) {
       .self$realYields <- realYields
       .self$outKF <- outKF
+      .self$yieldTenors <- yieldTenors
     },
     
     # Get and Set functions
@@ -32,6 +59,17 @@ yieldObj <- setRefClass("yieldObj",
       .self$outKF = newOut
     },
     
+    getYieldTenors = function(){
+      return(.self$yieldTenors)
+    },
+    
+    setYieldTenors = function(newTenors){
+      .self$YieldTenors = newTenors
+    },
+    
+    
+    # Main functions
+    
     computeOutKF = function(){
       outPut <- .yieldMC(.self$realYields)
       .self$setOutKF(outPut)
@@ -42,11 +80,16 @@ yieldObj <- setRefClass("yieldObj",
       outPut <- .self$getOutKF()
       hStep <- as.numeric(as.Date(valDate) - as.Date(outPut[[6]]))
       
+      dupInds <- dupInd(tenors)
+      if(hStep <= 0){
+        stop("Not forecasting outside of sample.")
+      }
+      
       someTens <- outPut[[8]]
       C <- outPut[[7]]
       A <- outPut[[1]]
       
-      foreEX <- C %*% (A %^% hStep + outPut[[9]]) %*% outPut[[2]]
+      foreEX <- C %*% ((A %^% hStep) %*% outPut[[2]]  + outPut[[9]])
       
       foreVAR <-  (A %^% hStep) %*% outPut[[3]] %*% t(A %^% hStep) + outPut[[5]]
       for(i in 1:(hStep - 1)){
@@ -59,7 +102,9 @@ yieldObj <- setRefClass("yieldObj",
       
       for(i in 1:nrow(simMat)){
         tempVar <- as.vector(foreEX + mvrnorm(mu = rep(0,nrow(foreVAR)), Sigma = foreVAR))
-        simMat[i,] <- interp_yc(someTens,tempVar,tenors)$ZERO_YLD1
+        tempVec <- interp_yc(someTens,tempVar,unique(sort(tenors)))$ZERO_YLD1
+        
+        simMat[i,] <- tempVec[dupInds]
       }
       
       return(simMat)
@@ -71,10 +116,21 @@ yieldObj <- setRefClass("yieldObj",
       names(.self$realYields) <- tempNames
     },
     
-    somePV = function(something){
-      NULL
+    yieldInS = function(valDate,tenors){
+      
+      lastDate = rownames(.self$getRealYields())
+      lastDate = lastDate[length(lastDate)]
+      
+      if(as.Date(lastDate) < valDate){
+        stop("Attempting to find yields beyond bond sample information. Use simTen instead.")
+      }
+      currBondYields <- .self$realYields[valDate,]
+      currTTM <- .self$getYieldTenors()
+      dupInds <- dupInd(tenors)
+      
+      return(interp_yc(currTTM,currBondYields,unique(sort(tenors)))$ZERO_YLD1[dupInds])
+      
     }
-    
     
     
   )

@@ -54,7 +54,7 @@ interp_yc <- function(ttms, yieldVec,newTen, degree = 3){
     }
     return(B.mat) # return the matrix
   }
-  
+
   int_knots <- ttms
   N <- length(ttms)
   if(N %in% c(5, 6)){

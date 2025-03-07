@@ -301,7 +301,6 @@ library(expm)
       y_t[[t]] <- as.matrix(yields[[t]]$ZERO_YLD1)  
     }
     
-    print(y_t[[t]])
     # Initial state (x_{0|0}) and covariance (Sigma_{0|0})
     last_x <- matrix(c(5, -3, 3), nrow = 3, ncol = 1) # initialize at OLS
     last_Sig <- diag(3)

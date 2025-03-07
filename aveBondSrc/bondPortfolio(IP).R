@@ -46,7 +46,7 @@ bondPortfolio <- setRefClass("bondPortfolio",
     },
     
     setCurrDate = function(newDate){
-      .self$currDate <- newCurrDate
+      .self$currDate <- newDate
     },
     
     
@@ -81,7 +81,7 @@ bondPortfolio <- setRefClass("bondPortfolio",
       }
       
       yieldPV <- function(valDate,tenors){
-        NULL
+        return(  self$yieldObj$yieldInS(valDate,tenors))
       }
       
       if (as.Date(valDate) < as.Date(bondType$issueDate)) {
@@ -112,16 +112,24 @@ bondPortfolio <- setRefClass("bondPortfolio",
         # number of cash flows left:
         
         if(as.Date(valDate) > as.Date(.self$yieldObj$getOutKF()[[6]])){
-          yields <- yieldMC(valDate,unique(c(ttmCoupons[ttmCoupons > 0],ttm))) / 100 # yields to maturity
+          yields <- yieldMC(valDate,c(ttmCoupons[ttmCoupons > 0],ttm)) / 100 # yields to maturity
+          
+          pvCoupons <- (bondType$couponRate / period) * (1 + yields[,1:(ncol(yields)-1)]) ** 
+            (-ttmCoupons[ttmCoupons > 0])
+          pvCoupons <- as.vector(rowSums(pvCoupons))
+          
+          pvFace <- as.vector(1/(1+yields[,ncol(yields)]) ** ttm)
         }
         else{
-          yields <- yieldPV(valDate,unique(c(ttmCoupons[ttmCoupons > 0],ttm))) / 100
+          yields <- yieldPV(valDate,c(ttmCoupons[ttmCoupons > 0],ttm)) / 100
+          
+          pvCoupons <- (bondType$couponRate / period) * (1 + yields[-length(yields)]) ** 
+            (-ttmCoupons[ttmCoupons > 0])
+          pvCoupons <- sum(rowSums(pvCoupons))
+          
+          pvFace <- 1/(1+yields[length(yields)]) ** ttm
         }
-        pvCoupons <- (bondType$couponRate / period) * (1 + yields[,1:(ncol(yields)-1)]) ** 
-          (-ttmCoupons[ttmCoupons > 0])
-        pvCoupons <- as.vector(rowSums(pvCoupons))
 
-        pvFace <- as.vector(1/(1+yields[,ncol(yields)]) ** ttm)
       }
         
       else{
@@ -129,7 +137,7 @@ bondPortfolio <- setRefClass("bondPortfolio",
         ttm <- timeToMaturity(as.Date(valDate),
                               as.Date(bondType$maturityDate),
                               bondType$countingConvention)
-        yields <- yieldMC(valDate,ttm,realYields) / 100
+        yields <- yieldMC(valDate,ttm) / 100
         pvFace <- as.vector(1/(1+yields) ** ttm)
         pvCoupons <- 0
       }
@@ -144,7 +152,7 @@ bondPortfolio <- setRefClass("bondPortfolio",
       for(i in 1:nrow(actTable)){
         currOb <- actTable[i,]
         currPV <- .self$.getAssetPV(valDate = valDate, bondType = bondDict[[currOb[1]]], 
-               numUnits = currOb[[2]], hasCoupon = currOb[[3]])
+               numUnits = currOb[[3]], hasCoupon = currOb[[2]])
         assetPV <- assetPV + currPV
       }
       return(assetPV)
@@ -177,8 +185,11 @@ bondPortfolio <- setRefClass("bondPortfolio",
             cpn <- currActTable[currActTable$bondID == a,"numUnits"] * cpn_rate
             currCashPos$updateCashPos('cashUp',cpn,noAdj)
             
-            transOb <- c(as.character(newDate),cpn,'Receive Coupon',a)
-            currTranTable <- rbind(currTranTable,transOb)
+            transOb <- list(as.character(newDate),cpn,'Receive Coupon',a)
+            tranNames <- names(currTranTable)
+            currTranTable <- rbind(currTranTable, transOb)
+            names(currTranTable) <- tranNames
+
             noAdj <- FALSE
           }
           
@@ -187,7 +198,7 @@ bondPortfolio <- setRefClass("bondPortfolio",
             FV <- 1 * currActTable[currActTable$bondID == a,"numUnits"]
             currCashPos$updateCashPos('cashUp',FV,noAdj)
             
-            transOb <- c(as.character(newDate), FV, 'Receive Redemption Amount', a)
+            transOb <- list(as.character(newDate), FV, 'Receive Redemption Amount', a)
             currActTable <- currActTable[-which(currActTable$bondID == a),]
             
             currTranTable <- rbind(currTranTable, transOb)
@@ -219,9 +230,13 @@ bondPortfolio <- setRefClass("bondPortfolio",
             currPV <- .getAssetPV(newDate,currBondType, currBond[3], currBond[2])
             currCashPos$updateCashPos('cashUp',currPV,noAdj)
             
-            transOb <- c(as.character(newDate), currPV, 'Sell All', bondID)
-            currTranTable <- rbind(currTranTable, transOb)
+            transOb <- data.frame(transDate = as.character(newDate), amt = currPV, 
+                                  action = 'Sell All', bondID = bondID)
             
+            tranNames <- names(currTranTable)
+            currTranTable <- rbind(currTranTable, transOb)
+            names(currTranTable) <- tranNames
+
             
             currActTable <- currActTable[-which(currActTable$bondID == bondID),]
             
@@ -235,17 +250,19 @@ bondPortfolio <- setRefClass("bondPortfolio",
         else if(action == 'buy'){
           
           if(!is.na(numUnits)){
-            
-            currBond <- c(bondID, length(bondType$getBondSchedule()) != 0, numUnits)
-            currPV <- .getAssetPV(newDate, currBondType, currBond[3], currBond[2])
+
+            currBond <- list(bondID, (length(bondType$getBondSchedule()) != 0), numUnits)
+
+            currPV <- .getAssetPV(newDate, currBondType, currBond[[3]], currBond[[2]])
             currCashPos$updateCashPos('cashDown',currPV,noAdj)
             
-            transOb <- c(as.character(newDate), currPV, 'Buy', bondID)
-            tranNames <- names(tranTable)
+            transOb <- data.frame(transDate = as.character(newDate), amt = currPV, 
+                                  action = 'Buy', bondID = bondID)
+            tranNames <- names(currTranTable)
             currTranTable <- rbind(currTranTable, transOb)
             names(currTranTable) <- tranNames
             
-            actNames <- names(actTable)
+            actNames <- names(currActTable)
             currActTable <- rbind(currActTable,currBond)
             names(currActTable) <- actNames
             
@@ -281,8 +298,12 @@ bondPortfolio <- setRefClass("bondPortfolio",
             currCashPos$updateCashPos('cashUp',theDiff,noAdj)
             currActTable[which(currActTable$bondID == bondID),] <- currBond
             
-            transOb <- c(as.character(newDate), theDiff, 'Strip All', bondID)
+
+            transOb <- data.frame(transDate = as.character(newDate), amt = theDiff, 
+                                  action = 'Strip All', bondID = bondID)
+            tranNames <- names(currTranTable)
             currTranTable <- rbind(currTranTable, transOb)
+            names(currTranTable) <- tranNames
           }
           else{
             stop('Strip for x out of n number of units not implemented.')
