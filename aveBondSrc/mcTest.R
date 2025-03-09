@@ -41,7 +41,7 @@ coupBond <- bondType(couponRate = 0.05,
                  callable = F)
 
 iniCash <- cashPosition(surplus = 10000, deficit = 0, 
-                        fixedRate = log(1.07 ^ (1 / 365)))
+                        fixedRate = log(1.03 ^ (1 / 365)))
 bp$setCashPosOb(iniCash)
 
 myLedge <- bondLedger()
@@ -62,6 +62,7 @@ yo <- yieldObj(realYields = yieldMat, yieldTenors = c(1 / 12, 3 / 12, 6 / 12, 1,
 #########################################################
 yo$computeOutKF()
 #########################################################
+
 
 bp$setYieldObj(yo)
 

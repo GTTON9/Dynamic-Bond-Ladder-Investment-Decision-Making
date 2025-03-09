@@ -90,8 +90,8 @@ bondLedger <- setRefClass("bondLedger",
   )
 )
 
-bL <- bondLedger('2024-01-01')
-bL$appendBondDict(data.frame(x = 1:5,y = 6:10))
-bL$appendBondDict(c(5,10))
-bL$getBondDict()
-bL$getDictVal('b2')
+# bL <- bondLedger('2024-01-01')
+# bL$appendBondDict(data.frame(x = 1:5,y = 6:10))
+# bL$appendBondDict(c(5,10))
+# bL$getBondDict()
+# bL$getDictVal('b2')

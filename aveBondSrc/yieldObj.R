@@ -99,8 +99,6 @@ yieldObj <- setRefClass("yieldObj",
       
       foreVAR <- C %*% foreVAR %*% t(C) + outPut[[4]]
       
-      simMat <- matrix(nrow = simCount,ncol = length(tenors))
-      
 
       tempVar <-mvrnorm(n = simCount,mu = foreEX,Sigma = foreVAR)
       
