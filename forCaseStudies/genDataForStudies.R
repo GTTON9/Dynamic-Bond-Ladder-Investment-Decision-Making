@@ -29,9 +29,9 @@ generateYields <- function(state, tenors, lambda, A, Q, R, startDate, endDate, r
   }
   
   
-  tsBetas <- matrix(nrow = 3, ncol = timeLength)
+  tsBetas <- matrix(nrow = 3, ncol = timeLength + 1)
   tsBetas[,1] <- state
-  for (i in 2:timeLength) {
+  for (i in 2:(timeLength+1)) {
     tsBetas[,i] <- icpt + A %*% tsBetas[,i-1] + mvrnorm(mu = rep(0, 3), Sigma = Q)
     if(isJan1(dates[i]) && randInvert) { # randomly invert the curve 
       switch <- as.logical(rbinom(1,1,.5))
@@ -53,7 +53,7 @@ generateYields <- function(state, tenors, lambda, A, Q, R, startDate, endDate, r
   rownames(yields) <- as.character(dates)
   return(yields)
 }
-
+seq(as.Date('2000-01-01'), as.Date('2000-01-30'), 1)
 
 yields <- generateYields(state = c(5, 3, -3), 
                          tenors = c(1, 5, 10, 15, 20), 
