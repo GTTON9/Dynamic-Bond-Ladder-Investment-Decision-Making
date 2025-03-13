@@ -120,7 +120,9 @@ bondPortfolio <- setRefClass("bondPortfolio",
 
           pvCoupons <- (bondType$couponRate / period) * (1 + yields[,1:(ncol(yields)-bern)]) ** 
             (-ttmCoupons[ttmCoupons > 0])
-          pvCoupons <- as.vector(rowSums(pvCoupons))
+          if(is.matrix(pvCoupons)) {
+            pvCoupons <- as.vector(rowSums(pvCoupons))
+          }
           
           pvFace <- as.vector(1/(1+yields[,ncol(yields)]) ** ttm)
         }
@@ -129,7 +131,10 @@ bondPortfolio <- setRefClass("bondPortfolio",
           
           pvCoupons <- (bondType$getCouponRate() / period) * (1 + yields[-length(yields)]) ** 
             (-ttmCoupons[ttmCoupons > 0])
-          pvCoupons <- as.numeric(sum(pvCoupons))
+          
+          if(is.matrix(pvCoupons)) {
+            pvCoupons <- as.vector(rowSums(pvCoupons))
+          }
           
           pvFace <- as.numeric(1/(1+yields[length(yields)]) ** ttm)
         }
@@ -170,6 +175,9 @@ bondPortfolio <- setRefClass("bondPortfolio",
       actTable <- .self$getBondLedgerOb()$getActTable()
       
       assetPV <- 0
+      if(nrow(actTable) == 0) {
+        return(assetPV)
+      }
       for(i in 1:nrow(actTable)){
         currOb <- actTable[i,]
         currPV <- .self$.getAssetPV(valDate = valDate, bondType = bondDict[[currOb[[1]]]], 

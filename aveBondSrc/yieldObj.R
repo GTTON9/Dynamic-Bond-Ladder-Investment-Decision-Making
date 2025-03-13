@@ -76,7 +76,7 @@ yieldObj <- setRefClass("yieldObj",
       .self$setOutKF(outPut)
     },
     
-    simTen = function(valDate,tenors,simCount = 1000){
+    simTen = function(valDate,tenors,simCount = 100){
       
 
       

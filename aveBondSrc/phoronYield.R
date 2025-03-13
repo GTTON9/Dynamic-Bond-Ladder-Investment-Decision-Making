@@ -18,7 +18,7 @@ library(plyr)
   
   # retrieve the tenors as strings
   tenorChar <- colnames(yields)
-  
+  print(colnames(yields))
   dates <- rownames(yields)
   
   for(i in 1:length(colnames(yields))) {
@@ -58,7 +58,7 @@ library(plyr)
   
   
   # cubic spline interp.
-  myTens <- seq(1, max(tenorNum),length.out = 8)
+  myTens <- seq(1, max(tenorNum),length.out = 5)
 
   # fit static nelson siegel function
   fit_nelson_siegel <- function(yields, lambda, tenors,newTen){
@@ -156,7 +156,7 @@ library(plyr)
   }
   
   
-  funkyOut <- fit_nelson_siegel(yieldMat, 0.33, tenorNum, myTens)
+  funkyOut <- fit_nelson_siegel(yields, 0.33, tenorNum, myTens)
   
   tsBetas <- funkyOut$betas
   
