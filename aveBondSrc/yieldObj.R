@@ -76,11 +76,15 @@ yieldObj <- setRefClass("yieldObj",
       .self$setOutKF(outPut)
     },
     
-    simTen = function(valDate,tenors,simCount = 500){
+    simTen = function(valDate,tenors,simCount = 1000){
+      
+
       
       outPut <- .self$getOutKF()
+
       hStep <- as.numeric(as.Date(valDate) - as.Date(outPut[[6]]))
       
+
       dupInds <- dupInd(tenors)
       if(hStep <= 0){
         stop("Not forecasting outside of sample.")
@@ -90,11 +94,21 @@ yieldObj <- setRefClass("yieldObj",
       C <- outPut[[7]]
       A <- outPut[[1]]
       
-      foreEX <- C %*% ((A %^% hStep) %*% outPut[[2]]  + outPut[[9]])
+      interFunc <- function(h){
+        return( do.call(cbind,lapply((h - 1):0,FUN = function(h) A %^% h )) ) 
+      }
+      
+      u <- outPut[[9]]
+      bigTerm <- interFunc(hStep) %*% rep(u,hStep)
+      
+      
+      foreEX <- C %*% ((A %^% hStep) %*% outPut[[2]]  + bigTerm)
       
       foreVAR <-  (A %^% hStep) %*% outPut[[3]] %*% t(A %^% hStep) + outPut[[5]]
-      for(i in 1:(hStep - 1)){
-        foreVAR <- foreVAR + (A %^% i) %*% outPut[[5]] %*% t((A %^% i))
+      if(hStep > 1){
+        for(i in 1:(hStep - 1)){
+          foreVAR <- foreVAR + (A %^% i) %*% outPut[[5]] %*% t((A %^% i))
+        }
       }
       
       foreVAR <- C %*% foreVAR %*% t(C) + outPut[[4]]

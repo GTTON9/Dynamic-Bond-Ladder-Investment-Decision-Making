@@ -15,10 +15,11 @@ library(xts)
 gbu <- pdfetch_FRED(c("DGS1MO", "DGS3MO", "DGS6MO", "DGS1",
                       "DGS2", "DGS3", "DGS5", "DGS7", "DGS10", "DGS20"))
 
-bp <- bondPortfolio(currDate = '2015-12-31')
+# bp <- bondPortfolio(currDate = '2015-12-31')
+bp <- bondPortfolio(currDate = '2014-12-31')
 
 bond <- bondType(couponRate = 0,
-                     issueDate = "2015-01-01",
+                     issueDate = "2014-01-01",
                      maturityDate = "2033-01-01",
                      period = 0,
                      countingConvention = "30/360",
@@ -27,12 +28,12 @@ bond <- bondType(couponRate = 0,
                      callable = F)
 
 
-startDate <- as.Date("2015-01-01") + 30
+startDate <- as.Date("2014-01-01") + 30
 endDate <- as.Date("2033-01-01")
 
 makeSched <- seq(startDate,endDate,length.out = 18 * 2)
 coupBond <- bondType(couponRate = 0.05,
-                 issueDate = "2015-01-01",
+                 issueDate = "2014-01-01",
                  maturityDate = "2033-01-01",
                  period = 2,
                  countingConvention = "30/360",
@@ -49,7 +50,7 @@ bp$setBondLedgerOb(myLedge)
 
 
 # yieldMat <- as.matrix(na.omit(as.data.frame(gbu["2012-01-01::2016-01-04"])))
-yieldMat <- as.matrix(gbu["2012-01-01::2016-01-04"])
+yieldMat <- as.matrix(gbu["2012-01-01::2015-01-05"])
 yieldMat <- yieldMat[rowSums(is.na(yieldMat)) != ncol(yieldMat),]
 
 
@@ -72,15 +73,16 @@ bp$bondUpdate('buy',numUnits = 9000, bondType = coupBond, moveForward = FALSE, n
 
 
 # '2033-01-02'
-while(as.Date(bp$getCurrDate()) != as.Date('2016-01-04')){
+while(as.Date(bp$getCurrDate()) != as.Date('2015-01-05')){
   bp$bondUpdate('none',moveForward = TRUE)
 }
 
 tsDF <- as.data.frame(matrix(ncol = 4,nrow = 0))
 colnames(tsDF) <- c('Date','PFV_low','PFV_mean',"PFV_up")
 
-while(as.Date(bp$getCurrDate()) != as.Date('2016-01-31')){
+while(as.Date(bp$getCurrDate()) != as.Date('2025-01-31')){
   bp$bondUpdate('none',moveForward = TRUE)
+  
   portVals <- bp$getPortVal()
   
   pNames <- names(tsDF)
