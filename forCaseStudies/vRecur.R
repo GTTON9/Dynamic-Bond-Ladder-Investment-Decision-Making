@@ -1,3 +1,4 @@
+source("forCaseStudies/funcW.R")
 vRecur <- function(currDate,terminalDate,bp,bondID){
   
   if((as.Date(terminalDate) - as.Date(currDate)) == 1){
@@ -24,7 +25,7 @@ vRecur <- function(currDate,terminalDate,bp,bondID){
 
 
  
-# # result <- vRecur(list(bp),currDate = bp$getCurrDate(),terminalDate = '2015-01-31',2)
+# result <- vRecur(bp,currDate = bp$getCurrDate(),terminalDate = '2015-01-31',2)
 # 
 # start = Sys.time()
 # result <- vRecur(bp,currDate = bp$getCurrDate(),terminalDate = '2022-01-31',2)
