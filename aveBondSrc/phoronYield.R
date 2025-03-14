@@ -18,7 +18,6 @@ library(plyr)
   
   # retrieve the tenors as strings
   tenorChar <- colnames(yields)
-  print(colnames(yields))
   dates <- rownames(yields)
   
   for(i in 1:length(colnames(yields))) {
@@ -58,10 +57,10 @@ library(plyr)
   
   
   # cubic spline interp.
-  myTens <- seq(1, max(tenorNum),length.out = 5)
+  myTens <- seq(1, max(tenorNum),length.out = 20)
 
   # fit static nelson siegel function
-  fit_nelson_siegel <- function(yields, lambda, tenors,newTen){
+  fit_nelson_siegel <- function(yields, lambda, tenors,newTen, tol = 0.01){
     # yield_list: Parameter of the form of a list of data frames containing ZCB spot rate
     # lambda: Individual lambda parameter for NS
     # start: starting date from the yield_list list
@@ -88,10 +87,6 @@ library(plyr)
         golInd <- which(colSums(!is.na(currMat)) != 0)
         currMat <- as.matrix(currMat[,golInd])
         
-        print(tenors[golInd])
-        print(dim(currMat))
-        print(tail(currMat))
-        print(newTen)
         
         currMat <- interp_yc(tenors[golInd],currMat,newTen = newTen)
         rownames(currMat) <- currRowNames
@@ -106,11 +101,27 @@ library(plyr)
     }
     
     Phi <- NS(newTen,lambda) # Construct Phi matrix for NS
+    prevBetas <- solve(t(Phi) %*% Phi) %*% t(Phi) %*% t(yieldMat)
+    currTol = 1
     
-    betas <- solve(t(Phi) %*% Phi) %*% t(Phi) %*% t(yieldMat)
-    eps <- yieldMat - t(Phi %*% betas)
-    
-    sig_hat2 <- t(eps) %*% eps / (nrow(yieldMat) - 3)
+    while(currTol > tol){
+      eps <- yieldMat - t(Phi %*% prevBetas)
+      sig_hat2 <- t(eps) %*% eps / (nrow(yieldMat) - 3)
+      
+      if(rcond(sig_hat2) < 0.0001){
+        sig_hat2 <- sig_hat2 + diag(nrow(sig_hat2)) * 0.0001 * max(diag(sig_hat2))
+      }
+      
+      L1 <- solve(t(chol(sig_hat2)))
+      Phi_ <- L1 %*% Phi
+      yMat_ <- L1 %*% t(yieldMat)
+      currBetas <- solve(t(Phi_) %*% Phi_) %*% t(Phi_) %*% yMat_
+      currTol = norm(currBetas - prevBetas) / norm(prevBetas)
+      
+      prevBetas <- currBetas
+      
+    }
+    betas = currBetas
     
     return(list(betas = betas, # fitted betas static: 1*3   dynamic: T*3
                 sigma2 = sig_hat2, yieldMat = yieldMat)) # lambda(input)

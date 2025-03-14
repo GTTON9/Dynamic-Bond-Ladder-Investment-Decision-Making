@@ -134,6 +134,8 @@ bondPortfolio <- setRefClass("bondPortfolio",
           
           if(is.matrix(pvCoupons)) {
             pvCoupons <- as.vector(rowSums(pvCoupons))
+          }else{
+            pvCoupons <- sum(pvCoupons)
           }
           
           pvFace <- as.numeric(1/(1+yields[length(yields)]) ** ttm)
@@ -286,6 +288,7 @@ bondPortfolio <- setRefClass("bondPortfolio",
             currPV <- .getAssetPV(newDate, currBondType, currBond[[3]], currBond[[2]])
             currCashPos$updateCashPos('cashDown',currPV,noAdj)
             
+            
             transOb <- data.frame(transDate = as.character(newDate), amt = currPV, 
                                   action = 'Buy', bondID = bondID)
             tranNames <- names(currTranTable)
@@ -364,6 +367,7 @@ bondPortfolio <- setRefClass("bondPortfolio",
     
     getPortVal = function(){
       return( .self$getCashPos() + .self$getAssetPV() )
+    
     }
   )
 )

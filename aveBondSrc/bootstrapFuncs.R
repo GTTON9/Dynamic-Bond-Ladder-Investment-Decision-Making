@@ -68,6 +68,7 @@ interp_yc <- function(ttms, yieldMat,newTen, degree = 3){
   }
   
 
+
   if((1 %in% dim(yieldMat)) | is.vector(yieldMat)){
     yields <- t(c(0,yieldMat))
   }else{
@@ -87,6 +88,5 @@ interp_yc <- function(ttms, yieldMat,newTen, degree = 3){
   
   interpolated_yields <- t(B2 %*% alphas) # create dataframes for plotting
 
-  
   return(interpolated_yields)
 }

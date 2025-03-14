@@ -29,7 +29,7 @@ dupInd <- function(someVec){
 
 yieldObj <- setRefClass("yieldObj",
   fields = list(
-    realYields = "matrix",
+    realYields = "ANY",
     yieldTenors = "numeric",
     outKF = "list"
   ),
@@ -76,7 +76,7 @@ yieldObj <- setRefClass("yieldObj",
       .self$setOutKF(outPut)
     },
     
-    simTen = function(valDate,tenors,simCount = 100){
+    simTen = function(valDate,tenors,simCount = 1000){
       
 
       
@@ -98,12 +98,13 @@ yieldObj <- setRefClass("yieldObj",
         return( do.call(cbind,lapply((h - 1):0,FUN = function(h) A %^% h )) ) 
       }
       
+      
       u <- outPut[[9]]
       bigTerm <- interFunc(hStep) %*% rep(u,hStep)
       
       
       foreEX <- C %*% ((A %^% hStep) %*% outPut[[2]]  + bigTerm)
-      
+
       foreVAR <-  (A %^% hStep) %*% outPut[[3]] %*% t(A %^% hStep) + outPut[[5]]
       if(hStep > 1){
         for(i in 1:(hStep - 1)){
@@ -142,8 +143,8 @@ yieldObj <- setRefClass("yieldObj",
       currBondYields <- .self$realYields[as.character(valDate),]
       currTTM <- .self$getYieldTenors()
       dupInds <- dupInd(tenors)
-      
-      return(interp_yc(currTTM,currBondYields,unique(sort(tenors)))[dupInds])
+
+      return(as.vector(interp_yc(currTTM,currBondYields,unique(sort(tenors))))[dupInds])
       
     }
   )
