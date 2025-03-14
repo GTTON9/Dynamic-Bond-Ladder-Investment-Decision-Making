@@ -25,7 +25,7 @@ generateYields <- function(state, tenors, lambda, A, Q, R, startDate, endDate, r
   
   isJan1 <- function(date) {
     date <- as.Date(date)  # Convert to Date format
-    return(format(date, "%m-%d") == "01-01")
+    return(format(date, "%d") == "01")
   }
   
   
@@ -53,16 +53,18 @@ generateYields <- function(state, tenors, lambda, A, Q, R, startDate, endDate, r
   rownames(yields) <- as.character(dates)
   return(yields)
 }
-seq(as.Date('2000-01-01'), as.Date('2000-01-30'), 1)
-
-yields <- generateYields(state = c(5, 3, -3), 
-                         tenors = c(1, 5, 10, 15, 20), 
-                         lambda = 0.33, 
-                         A = diag(c(0.9, 0.8, 0.7)), 
-                         Q = 0.01 * diag(3),
-                         R = 0.02 * diag(5), 
-                         startDate = "2001-01-01", 
-                         endDate = '2005-01-01', 
-                         randInvert = T,
-                         byeWeekend = T)
+# seq(as.Date('2000-01-01'), as.Date('2000-01-30'), 1)
+# 
+# yields <- generateYields(state = c(5, 3, -3), 
+#                          tenors = c(1, 5, 10, 15, 20), 
+#                          lambda = 0.33, 
+#                          A = diag(c(0.9, 0.8, 0.7)), 
+#                          Q = 0.01 * diag(3),
+#                          R = 0.02 * diag(5), 
+#                          startDate = "2001-01-01", 
+#                          endDate = '2002-01-01', 
+#                          randInvert = T,
+#                          byeWeekend = T)
+# 
+# yields[100,]
 
