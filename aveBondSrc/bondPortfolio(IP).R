@@ -71,6 +71,8 @@ bondPortfolio <- setRefClass("bondPortfolio",
     
     
     # Let's say you already created a new actTable as part of entertaining possible action.
+    # Note that for certain counting conventions, some dates are removed from consideration 
+    # for discounting. This may lead to sudden drops in the portfolio value, but they are immaterial.
     
     .getAssetPV = function(valDate, bondType, numUnits, hasCoupon) {
       
@@ -121,6 +123,7 @@ bondPortfolio <- setRefClass("bondPortfolio",
           if(is.matrix(pvCoupons)) {
             pvCoupons <- as.vector(rowSums(pvCoupons))
           }
+          
           
           pvFace <- as.vector(1/(1+yields[,ncol(yields)]) ** ttm)
         }

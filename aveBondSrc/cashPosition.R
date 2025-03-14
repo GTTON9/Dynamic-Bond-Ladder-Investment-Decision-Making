@@ -115,8 +115,18 @@ cashPosition <- setRefClass("cashPosition",
         newDeficit <- currDeficit
       }
       
-      .self$setDeficit(max(newDeficit + h1(action,amt,moveForward),0))
-      .self$setSurplus(max(newSurplus + h2(action,amt,moveForward),0))
+      if(action == 'cashUp'){
+        .self$setSurplus(max(newSurplus + h2(action,amt,moveForward),0))
+        .self$setDeficit(max(newDeficit + h1(action,amt,moveForward),0))
+      }else if(action == 'cashDown'){
+        .self$setDeficit(max(newDeficit + h1(action,amt,moveForward),0))
+        .self$setSurplus(max(newSurplus + h2(action,amt,moveForward),0))
+      }else if(!(action == 'none')){
+        stop('Invalid action string specified')
+      }else{
+        .self$setDeficit(newDeficit)
+        .self$setSurplus(newSurplus)
+      }
     }
     
   )

@@ -12,8 +12,10 @@ library(expm)
 library(pdfetch)
 library(xts)
 
-gbu <- pdfetch_FRED(c("DGS1MO", "DGS3MO", "DGS6MO", "DGS1",
-                      "DGS2", "DGS3", "DGS5", "DGS7", "DGS10", "DGS20"))
+if(!exists("gbu")){
+  gbu <- pdfetch_FRED(c("DGS1MO", "DGS3MO", "DGS6MO", "DGS1",
+                        "DGS2", "DGS3", "DGS5", "DGS7", "DGS10", "DGS20"))
+}
 
 # bp <- bondPortfolio(currDate = '2015-12-31')
 bp <- bondPortfolio(currDate = '2014-12-31')
@@ -42,7 +44,7 @@ coupBond <- bondType(couponRate = 0.05,
                  callable = F)
 
 iniCash <- cashPosition(surplus = 10000, deficit = 0, 
-                        fixedRate = log(1.03 ^ (1 / 365)))
+                        fixedRate = log(1.5 ^ (1 / 365)))
 bp$setCashPosOb(iniCash)
 
 myLedge <- bondLedger()
@@ -69,18 +71,22 @@ bp$setYieldObj(yo)
 
 
 bp$bondUpdate('buy',numUnits = 1000, bondType = bond, moveForward = FALSE, notChecked = TRUE)
-bp$bondUpdate('buy',numUnits = 9000, bondType = coupBond, moveForward = FALSE, notChecked = TRUE)
+bp$bondUpdate('buy',numUnits = 3000, bondType = coupBond, moveForward = FALSE, notChecked = TRUE)
 
 
 # '2033-01-02'
 while(as.Date(bp$getCurrDate()) != as.Date('2015-01-05')){
+
   bp$bondUpdate('none',moveForward = TRUE)
+
 }
 
+
+# bp$bondUpdate('sell', bondType = coupBond, moveForward = FALSE, notChecked = TRUE)
 tsDF <- as.data.frame(matrix(ncol = 4,nrow = 0))
 colnames(tsDF) <- c('Date','PFV_low','PFV_mean',"PFV_up")
 
-while(as.Date(bp$getCurrDate()) != as.Date('2025-01-31')){
+while(as.Date(bp$getCurrDate()) != as.Date('2015-01-31')){
   bp$bondUpdate('none',moveForward = TRUE)
   
   portVals <- bp$getPortVal()
@@ -165,3 +171,9 @@ lines(tenors[-length(tenors)],yo$getOutKF()[[7]] %*% yo$getOutKF()[[2]] )
 
 
 yo$getOutKF()[[6]]
+
+##########################################################################################
+
+# Secret ops
+
+result <- funcW(list(bp),currDate = bp$getCurrDate(),endDate = '2015-01-31')
