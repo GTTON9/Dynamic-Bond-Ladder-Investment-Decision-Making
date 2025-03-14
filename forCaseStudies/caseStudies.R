@@ -185,6 +185,6 @@ mergeDF[,3] <- as.numeric(mergeDF[,3])
 ggplot(mergeDF,aes(x = as.Date(Date),y = Double_Stationary)) + geom_line(linewidth = 1) + 
   geom_line(aes(x = as.Date(Date), y = Action_Stationary),colour = 'red') + theme_economist_white() + 
   xlab('Date') + ylab('Portfolio Value (in Dollars)') + 
-  ggtitle('Stationary vs Adapaptive (S.I.)')
+  ggtitle('Stationary vs Adapaptive (A.I.)')
 
 
