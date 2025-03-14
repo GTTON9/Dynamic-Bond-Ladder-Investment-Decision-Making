@@ -1,12 +1,4 @@
-funcW <- function(bpList,currDate = NA,terminalDate = NA,bondID = NA){
-  if(length(bpList) == 1 & is.list(bpList)){
-    bp <- bpList[[1]]
-  } else if(length(bpList) == 0 | !is.list(bpList)){
-    stop("No list of bond portfolios provided")
-  }else{
-    dateInd <- length(bpList) * as.numeric(as.Date(terminalDate) - as.Date(currDate))
-    bp <- bpVec[dateInd]
-  }
+funcW <- function(bp,currDate = NA,terminalDate = NA,bondID = NA){
   
   currActTable <- bp$getBondLedgerOb()$getActTable()
   coupBools <- currActTable[currActTable[,1] == bondID,2]
@@ -39,7 +31,7 @@ funcW <- function(bpList,currDate = NA,terminalDate = NA,bondID = NA){
       valVec[i] <- currVal
       if(currVal > preVal){
         preVal <- currVal
-        print(paste('<',preVal,'>'))
+
         currInd <- i
       }
       
