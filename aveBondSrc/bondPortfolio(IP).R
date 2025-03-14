@@ -6,7 +6,6 @@ bondPortfolio <- setRefClass("bondPortfolio",
     bondLedger = 'ANY',
     cashPosition = "ANY",
     currDate = 'character',
-
     yieldObj = "ANY"
   ),
   
@@ -14,7 +13,6 @@ bondPortfolio <- setRefClass("bondPortfolio",
     initialize = function(bondLedger = NULL,cashPosition = NULL,currDate = NA_character_, 
                           yieldObj = NULL) {
       
-      .self$posList <- list()
       .self$bondLedger <- bondLedger
       .self$cashPosition <- cashPosition
       
