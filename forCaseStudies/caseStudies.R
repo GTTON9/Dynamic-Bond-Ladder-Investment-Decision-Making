@@ -145,6 +145,7 @@ for(i in 1:length(bpSched)){
       result <- vRecur(por1,currDate = por1$getCurrDate(),terminalDate = as.character(currTermin),j)
       action <- result$bestAction
       bondType <- result$bondType
+      print(result$currDate)
       
       if(!is.na(action)){
         por1$bondUpdate(action, bondType = bondType, moveForward = FALSE, notChecked = TRUE)

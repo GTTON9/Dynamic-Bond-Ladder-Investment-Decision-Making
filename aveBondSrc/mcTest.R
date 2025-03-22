@@ -73,7 +73,6 @@ bp$setYieldObj(yo)
 bp$bondUpdate('buy',numUnits = 1000, bondType = bond, moveForward = FALSE, notChecked = TRUE)
 bp$bondUpdate('buy',numUnits = 3000, bondType = coupBond, moveForward = FALSE, notChecked = TRUE)
 
-
 # '2033-01-02'
 while(as.Date(bp$getCurrDate()) != as.Date('2015-01-05')){
 
