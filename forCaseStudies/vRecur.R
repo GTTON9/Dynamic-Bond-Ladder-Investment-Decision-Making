@@ -25,10 +25,10 @@ vRecur <- function(currDate,terminalDate,bp,bondID){
 
 
  
-# result <- vRecur(bp,currDate = bp$getCurrDate(),terminalDate = '2015-01-31',2)
-# 
-# start = Sys.time()
 # result <- vRecur(bp,currDate = bp$getCurrDate(),terminalDate = '2022-01-31',2)
+
+# start = Sys.time()
+# result <- vRecur(bp,currDate = bp$getCurrDate(),terminalDate = '2015-01-31',2)
 # end = Sys.time()
-# 
+
 # print(end - start)

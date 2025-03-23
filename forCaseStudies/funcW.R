@@ -20,6 +20,7 @@ funcW <- function(bp,currDate = NA,terminalDate = NA,bondID = NA){
       currBP <- bp$copy()
       currBP$bondUpdate(actSpace[i],numUnits = NA, bondType = bondDict[[bondID]], 
                         moveForward = FALSE, notChecked = TRUE)
+      
       while(as.Date(currBP$getCurrDate()) < as.Date(terminalDate)){
         currBP$bondUpdate('none')
         
@@ -37,7 +38,7 @@ funcW <- function(bp,currDate = NA,terminalDate = NA,bondID = NA){
       
     
   }
-  
+
   bestAction <- actSpace[currInd]
   
   if(bestAction != 'none'){
