@@ -177,7 +177,7 @@ library(plyr)
   # diag(A) <- c(yule_walker_ar1(tsBetas[1,])$phi,
   #              yule_walker_ar1(tsBetas[2,])$phi,
   #              yule_walker_ar1(tsBetas[3,])$phi)
-  myVarma <- VARMA(t(tsBetas), p = 1)
+  capture.output(myVarma <- VARMA(t(tsBetas), p = 1))
   A <- myVarma$Phi
   Q <- myVarma$Sigma
   
@@ -290,7 +290,7 @@ library(plyr)
   lastState <- states[,lastIdx]
   lastCov <- covs[[lastIdx]]
   lastDate <- dates[lastIdx]
-  
+
   outPut <- list(A,lastState,lastCov,obsCov,baseCov,lastDate,C,myTens,icpt)
   
   return(outPut)

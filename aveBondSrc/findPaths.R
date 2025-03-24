@@ -29,10 +29,10 @@ findPaths <- setRefClass("findPaths",
     },
     
     walkPaths = function(){
-      begDate <- .self$portObj$getCurrDate()
-      endDate <- .self$getEndDate()
-      bpSched <- seq(as.Date(begDate),as.Date(endDate),1)
-      invSched <- as.Date(monthsBtw(as.Date(begDate),as.Date(endDate)))
+      bDate <- .self$portObj$getCurrDate()
+      eDate <- .self$getEndDate()
+      bpSched <- seq(as.Date(bDate),as.Date(eDate),1)
+      invSched <- as.Date(monthsBtw(as.Date(bDate),as.Date(eDate))) - 1
       
       portDF <- as.data.frame(matrix(nrow = length(bpSched),ncol = 2))
       colnames(portDF) <- c('Date','portVal')
@@ -51,13 +51,13 @@ findPaths <- setRefClass("findPaths",
           stop('Houston we have a problem')
         }
         
-        currTermin <- invSched[invSched > bpSched[i]][1]
-        newPor <- .self$portObj$copy()
+        currTermin <- invSched[invSched >= bpSched[i]][1]
+        print(currTermin)
+        addCond <- (as.numeric(currTermin - bpSched[i]) == 0)
         currIDs <- .self$portObj$bondLedger$getActTable()$bondID
         
-        if(is.na(currTermin)){
+        if(addCond){
           newDate <- lubridate::ceiling_date(bpSched[i] + 1,unit = 'months') - 1
-          
           newBond <- bondType(
             couponRate = 0.03, 
             issueDate = as.character(bpSched[i]),
@@ -74,41 +74,62 @@ findPaths <- setRefClass("findPaths",
           portDF[i,] <- c(as.character(bpSched[i]),currVal)
           nadaVal <- nadaPort$getPortVal()
           nadaDF[i,] <- c(as.character(bpSched[i]),nadaVal)
-          .self$portObj$bondUpdate('buy',numUnits = 10, bondType = newBond, moveForward = TRUE, notChecked = TRUE)
-          nadaPort$bondUpdate('buy',numUnits = 10, bondType = newBond, moveForward = TRUE, notChecked = TRUE)
+          .self$portObj$bondUpdate('buy',numUnits = 1000, bondType = newBond, moveForward = TRUE, notChecked = TRUE)
+          nadaPort$bondUpdate('buy',numUnits = 1000, bondType = newBond, moveForward = TRUE, notChecked = TRUE)
+          
+          nadaPort$yieldObj$appRealYields(futureYields[i,],.self$portObj$getCurrDate())
+          .self$portObj$yieldObj$appRealYields(futureYields[i,],.self$portObj$getCurrDate())
+          .self$portObj$yieldObj$computeOutKF()
           
           next
         }
         
-        
-        if(!is.null(currIDs)){
+        # Use length on currIDs
+        if(!is.null(currIDs) & !is.logical(currIDs) & length(currIDs) != 0){
+          
+          prevW <- -Inf
+          maxResult <- NA
           
           for(j in currIDs){
-            result <- vRecur(.self$portObj,currDate = .self$portObj$getCurrDate(),terminalDate = as.character(currTermin),j)
+            #
+            result <- vRecur(.self$portObj,currDate = .self$portObj$getCurrDate(),
+                             terminalDate = as.character(currTermin),j)
+          #   W <- result$W
+          #   if(W > prevW){
+          #     maxResult <- result
+          #   }
+          #   prevW <- W
+          
+
             action <- result$bestAction
             bondType <- result$bondType
             resDate <- result$currDate
             
             if(!is.na(action) & (.self$portObj$getCurrDate() == resDate)){
               .self$portObj$bondUpdate(action, bondType = bondType, moveForward = FALSE, notChecked = TRUE)
-              break
+              print(action)
             }
           }
+          
           currVal <- mean(.self$portObj$getPortVal())
           portDF[i,] <- c(as.character(bpSched[i]),currVal)
           
           .self$portObj$bondUpdate('none',moveForward = TRUE)
         }else{
+          someVals <- .self$portObj$getPortVal()
+          print(length(someVals))
+          currVal <- mean(.self$portObj$getPortVal())
+          portDF[i,] <- c(as.character(bpSched[i]),currVal)
           .self$portObj$bondUpdate('none',moveForward = TRUE)
         }
-        
-        
+        # .self$portObj$yieldObj$outKF[[6]] == bpSched[i]
+        nadaPort$setYieldObj(.self$portObj$getYieldObj())
         nadaVal <- nadaPort$getPortVal()
         nadaDF[i,] <- c(as.character(bpSched[i]),nadaVal)
         nadaPort$bondUpdate('none',moveForward = TRUE)
         
-        nadaPort$yieldObj$appRealYields(futureYields[i,])
-        .self$portObj$yieldObj$appRealYields(futureYields[i,])
+        nadaPort$yieldObj$appRealYields(futureYields[i,],.self$portObj$getCurrDate())
+        .self$portObj$yieldObj$appRealYields(futureYields[i,],.self$portObj$getCurrDate())
         .self$portObj$yieldObj$computeOutKF()
         
       }

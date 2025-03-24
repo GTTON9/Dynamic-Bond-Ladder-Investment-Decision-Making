@@ -45,7 +45,7 @@ startDate <- as.Date("2025-02-01") + 30
 endDate <- as.Date("2026-02-01")
 
 makeSched <- seq(startDate,endDate,length.out = 4)
-bondList[[1]] <- bondType(couponRate = 0.05,
+bondList[[2]] <- bondType(couponRate = 0.05,
                           issueDate = "2025-02-01",
                           maturityDate = "2026-02-01",
                           period = 4,
@@ -58,7 +58,7 @@ startDate <- as.Date("2025-03-01") + 30
 endDate <- as.Date("2026-03-01")
 
 makeSched <- seq(startDate,endDate,length.out = 4)
-bondList[[1]] <- bondType(couponRate = 0.05,
+bondList[[3]] <- bondType(couponRate = 0.05,
                           issueDate = "2025-03-01",
                           maturityDate = "2026-03-01",
                           period = 4,
@@ -84,6 +84,17 @@ por1$setYieldObj(yo1)
 por1$bondUpdate('buy',
                 numUnits = 10000,
                 bondType = bondList[[1]],
+                moveForward = F,
+                notChecked = T)
+
+por1$bondUpdate('buy',
+                numUnits = 20000,
+                bondType = bondList[[2]],
+                moveForward = F,
+                notChecked = T)
+por1$bondUpdate('buy',
+                numUnits = 40000,
+                bondType = bondList[[3]],
                 moveForward = F,
                 notChecked = T)
 

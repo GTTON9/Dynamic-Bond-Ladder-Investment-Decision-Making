@@ -123,12 +123,15 @@ yieldObj <- setRefClass("yieldObj",
       return(simMat)
     },
     
-    appRealYields = function(newObs){
+    appRealYields = function(newObs, obDate = NA){
       tempNames <- names(.self$realYields)
       tempObs <- newObs
       names(tempObs) <- tempNames
       .self$realYields <- rbind(.self$realYields, tempObs)
       names(.self$realYields) <- tempNames
+      if(!is.na(obDate)){
+        rownames(.self$realYields)[nrow(.self$realYields)] <- obDate
+      }
     },
     
     yieldInS = function(valDate,tenors){

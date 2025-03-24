@@ -17,7 +17,8 @@ monthsBtw <- function(sDate,eDate){
   end = as.Date(eDate)
   
   forced_start <- as.Date(paste0(format(start, "%Y-%m"), "-01"))
-  forced_end <- as.Date(paste0(format(end, "%Y-%m"), "-01"))
+  forced_end <- as.Date(paste0(format(end, "%Y-%m"), "-01")) %m+% months(2)
+  
   
   seq_dates <- seq.Date(forced_start, forced_end, by = "month")
   return(format(seq_dates, "%Y-%m-%d"))
