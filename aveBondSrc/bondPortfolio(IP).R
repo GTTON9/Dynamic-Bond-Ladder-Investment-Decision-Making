@@ -213,7 +213,7 @@ bondPortfolio <- setRefClass("bondPortfolio",
           currSched <- if(length(currBondType$bondSchedule) != 0) as.Date(currBondType$bondSchedule) else
             list()
           
-          if(newDate %in% currSched){
+          if((newDate %in% currSched) & currActTable[currActTable$bondID == a,2]){
             cpn_rate <- currBondType$getCouponRate() / currBondType$getPeriod()
             cpn <- currActTable[currActTable$bondID == a,"numUnits"] * cpn_rate
             currCashPos$updateCashPos('cashUp',cpn,noAdj)

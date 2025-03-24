@@ -71,7 +71,7 @@ bp$setYieldObj(yo)
 
 
 bp$bondUpdate('buy',numUnits = 1000, bondType = bond, moveForward = FALSE, notChecked = TRUE)
-bp$bondUpdate('buy',numUnits = 3000, bondType = coupBond, moveForward = FALSE, notChecked = TRUE)
+bp$bondUpdate('buy',numUnits = 100000, bondType = coupBond, moveForward = FALSE, notChecked = TRUE)
 
 # '2033-01-02'
 while(as.Date(bp$getCurrDate()) != as.Date('2015-01-05')){
@@ -85,7 +85,7 @@ while(as.Date(bp$getCurrDate()) != as.Date('2015-01-05')){
 tsDF <- as.data.frame(matrix(ncol = 4,nrow = 0))
 colnames(tsDF) <- c('Date','PFV_low','PFV_mean',"PFV_up")
 
-while(as.Date(bp$getCurrDate()) != as.Date('2015-01-31')){
+while(as.Date(bp$getCurrDate()) != as.Date('2015-04-01')){
   bp$bondUpdate('none',moveForward = TRUE)
   
   portVals <- bp$getPortVal()

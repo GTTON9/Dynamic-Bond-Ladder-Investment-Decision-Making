@@ -70,14 +70,15 @@ findPaths <- setRefClass("findPaths",
           )
           idCount <- idCount + 1
           
+          # Fix this later by making bonds only purchaseable on trading days you know. For now I use "mean" function.
           currVal <- mean(.self$portObj$getPortVal())
           portDF[i,] <- c(as.character(bpSched[i]),currVal)
-          nadaVal <- nadaPort$getPortVal()
+          nadaVal <- mean(nadaPort$getPortVal())
           nadaDF[i,] <- c(as.character(bpSched[i]),nadaVal)
-          .self$portObj$bondUpdate('buy',numUnits = 1000, bondType = newBond, moveForward = TRUE, notChecked = TRUE)
-          nadaPort$bondUpdate('buy',numUnits = 1000, bondType = newBond, moveForward = TRUE, notChecked = TRUE)
+          .self$portObj$bondUpdate('buy',numUnits = 5000, bondType = newBond, moveForward = TRUE, notChecked = TRUE)
+          nadaPort$bondUpdate('buy',numUnits = 5000, bondType = newBond, moveForward = TRUE, notChecked = TRUE)
           
-          nadaPort$yieldObj$appRealYields(futureYields[i,],.self$portObj$getCurrDate())
+          nadaPort$yieldObj$appRealYields(futureYields[i,],as.character(.self$portObj$getCurrDate()))
           .self$portObj$yieldObj$appRealYields(futureYields[i,],.self$portObj$getCurrDate())
           .self$portObj$yieldObj$computeOutKF()
           
@@ -94,21 +95,20 @@ findPaths <- setRefClass("findPaths",
             #
             result <- vRecur(.self$portObj,currDate = .self$portObj$getCurrDate(),
                              terminalDate = as.character(currTermin),j)
-          #   W <- result$W
-          #   if(W > prevW){
-          #     maxResult <- result
-          #   }
-          #   prevW <- W
-          
-
-            action <- result$bestAction
-            bondType <- result$bondType
-            resDate <- result$currDate
-            
-            if(!is.na(action) & (.self$portObj$getCurrDate() == resDate)){
-              .self$portObj$bondUpdate(action, bondType = bondType, moveForward = FALSE, notChecked = TRUE)
-              print(action)
+            W <- result$W
+            if(W > prevW){
+              maxResult <- result
             }
+            prevW <- W
+          
+          }
+          action <- maxResult$bestAction
+          bondType <- maxResult$bondType
+          resDate <- maxResult$currDate
+          
+          if(!is.na(action) & (.self$portObj$getCurrDate() == resDate)){
+            .self$portObj$bondUpdate(action, bondType = bondType, moveForward = FALSE, notChecked = TRUE)
+            print(action)
           }
           
           currVal <- mean(.self$portObj$getPortVal())
@@ -123,7 +123,7 @@ findPaths <- setRefClass("findPaths",
           .self$portObj$bondUpdate('none',moveForward = TRUE)
         }
         # .self$portObj$yieldObj$outKF[[6]] == bpSched[i]
-        nadaPort$setYieldObj(.self$portObj$getYieldObj())
+        nadaPort$setYieldObj(.self$portObj$getYieldObj()$copy())
         nadaVal <- nadaPort$getPortVal()
         nadaDF[i,] <- c(as.character(bpSched[i]),nadaVal)
         nadaPort$bondUpdate('none',moveForward = TRUE)
