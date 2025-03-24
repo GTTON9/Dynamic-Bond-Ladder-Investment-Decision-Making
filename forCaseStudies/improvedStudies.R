@@ -17,6 +17,11 @@ library(xts)
 allYields <- na.omit(as.data.frame(gbu[rowSums(is.na(gbu)) != ncol(gbu),])) # Needs fixing in base code.
 
 tempXts <- xts(allYields, order.by=as.Date(rownames(allYields)))
+tempXts <- xts(rep(NA,length(seq(as.Date('2021-04-01'),as.Date('2025-03-20'),1))),
+               order.by = seq(as.Date('2021-04-01'),as.Date('2025-03-20'),1))
+tempXts <- merge.xts(someXts,tempXts,join = 'outer')[,-1]
+
+tempXts <- na.approx(someXts)
 pastYields <- as.matrix(tempXts["2021-04-01::2023-04-01"])
 futureYields <- as.matrix(tempXts["2023-04-02::"])
 
