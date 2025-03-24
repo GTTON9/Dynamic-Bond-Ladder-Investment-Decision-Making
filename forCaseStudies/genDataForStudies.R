@@ -14,7 +14,6 @@ generateYields <- function(state, tenors, lambda, A, Q, R, startDate, endDate, r
   # randInvert: If TRUE, the yield curve has a 50% prob of inverting every new year
   # byeWeekend: If TRUE, only yields for week days are calculated
   icpt <- (diag(3) - A) %*% state
-
   tenors <- sort(tenors)
   N <- length(tenors)
   cMat <- cbind(rep(1, N),
@@ -30,18 +29,30 @@ generateYields <- function(state, tenors, lambda, A, Q, R, startDate, endDate, r
   
   
   tsBetas <- matrix(nrow = 3, ncol = timeLength + 1)
+  tsSwitch <- matrix(nrow = 3, ncol = timeLength + 1)
+  
   tsBetas[,1] <- state
+  tsSwitch[,1] <- state
+  if (state[2] < 0) {
+    switchFactor <- 0.5
+  } else {
+    switchFactor <- 2
+  }
+  switch <- F
   for (i in 2:(timeLength+1)) {
-    tsBetas[,i] <- icpt + A %*% tsBetas[,i-1] + mvrnorm(mu = rep(0, 3), Sigma = Q)
+    tsBetas[,i] <-icpt + A %*% tsBetas[,i-1] + mvrnorm(mu = rep(0, 3), Sigma = Q)
+    if (switch) {
+      tsSwitch[,i] <- tsBetas[,i] * c(switchFactor, -1, 1)
+    } else {
+      tsSwitch[,i] <- tsBetas[,i]
+    }
     if(isJan1(dates[i]) && randInvert) { # randomly invert the curve 
-      switch <- as.logical(rbinom(1,1,.5))
-      if (switch) {
-        tsBetas[,i] <- diag(c(1, -1, -1)) %*% tsBetas[,i-1] + mvrnorm(mu = rep(0, 3), Sigma = Q)
-        icpt <- (diag(3) - A) %*% tsBetas[,i]
+      switch <- as.logical(rbinom(1,1,0.5))
       }
     }
-  }
-  yields <- cMat %*% tsBetas
+
+
+  yields <- cMat %*% tsSwitch
   
   # get rid of weekends if desired
   if (byeWeekend) {
